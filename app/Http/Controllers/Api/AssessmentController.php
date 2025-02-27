@@ -10,7 +10,7 @@ use App\Models\AssessmentSession;
 use App\Models\User;
 use App\Services\AIServiceFactory;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 
 class AssessmentController extends Controller
 {
@@ -36,12 +36,12 @@ class AssessmentController extends Controller
             ], 409);
         }
 
-        // Create new assessment session
+        // Create new assessment session with more detailed initial state
         $session = new AssessmentSession();
         $session->user_id = $user->id;
-        $session->current_phase = 1;
-        $session->current_question = 'introduction';
-        $session->responses = [];
+        $session->current_phase = 1; // Start with Phase 1
+        $session->current_question = 'age'; // Start with age question
+        $session->responses = []; // Initialize empty responses
         $session->status = 'in_progress';
         $session->started_at = now();
         $session->save();
@@ -62,13 +62,55 @@ class AssessmentController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        return new AssessmentSessionResource($assessment);
+        // Add phase information to the response
+        $phases = [
+            1 => 'Basic Information',
+            2 => 'Health Assessment',
+            3 => 'Diet Preferences',
+            4 => 'Lifestyle',
+            5 => 'Goals',
+            6 => 'Plan Customization'
+        ];
+
+        $assessmentData = new AssessmentSessionResource($assessment);
+        $assessmentData->additional([
+            'phase_name' => $phases[$assessment->current_phase] ?? 'Unknown Phase',
+            'total_phases' => count($phases),
+            'completion_percentage' => $this->calculateCompletionPercentage($assessment)
+        ]);
+
+        return $assessmentData;
+    }
+
+    /**
+     * Calculate assessment completion percentage
+     */
+    private function calculateCompletionPercentage(AssessmentSession $assessment)
+    {
+        // Define expected number of questions per phase
+        $questionsPerPhase = [
+            1 => 5, // Basic Information
+            2 => 4, // Health Assessment
+            3 => 4, // Diet Preferences 
+            4 => 4, // Lifestyle
+            5 => 3, // Goals
+            6 => 1  // Plan Customization
+        ];
+
+        $totalQuestions = array_sum($questionsPerPhase);
+        $completedQuestions = 0;
+
+        // Count completed questions based on responses
+        $responses = $assessment->responses ?? [];
+        $completedQuestions = count($responses);
+
+        // Calculate percentage
+        return min(100, round(($completedQuestions / $totalQuestions) * 100));
     }
 
     /**
      * Update assessment responses
      */
-    // app/Http/Controllers/Api/AssessmentController.php (continued)
     public function update(Request $request, AssessmentSession $assessment)
     {
         // Check permission
@@ -76,11 +118,13 @@ class AssessmentController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Validate input
+        // Validate input with more comprehensive validation
         $validated = $request->validate([
-            'current_phase' => 'sometimes|required|integer|min:1|max:8',
+            'current_phase' => 'sometimes|required|integer|min:1|max:6',
             'current_question' => 'sometimes|required|string',
             'responses' => 'sometimes|required|array',
+            'responses.*.question_id' => 'sometimes|required|string',
+            'responses.*.answer' => 'sometimes|required',
         ]);
 
         // Check if assessment is in progress
@@ -91,16 +135,39 @@ class AssessmentController extends Controller
             ], 400);
         }
 
+        // Handle batch updates to responses
+        if (isset($validated['responses']) && is_array($validated['responses'])) {
+            $currentResponses = $assessment->responses ?? [];
+
+            // Process each response in the batch
+            foreach ($validated['responses'] as $response) {
+                if (isset($response['question_id']) && isset($response['answer'])) {
+                    $currentResponses[$response['question_id']] = $response['answer'];
+                }
+            }
+
+            $validated['responses'] = $currentResponses;
+        }
+
         // Update assessment
         $assessment->fill($validated);
         $assessment->save();
 
+        // Add completion percentage to response
+        $assessmentResource = new AssessmentSessionResource($assessment);
+        $assessmentResource->additional([
+            'completion_percentage' => $this->calculateCompletionPercentage($assessment)
+        ]);
+
         return response()->json([
             'message' => 'Assessment updated successfully',
-            'assessment' => new AssessmentSessionResource($assessment)
+            'assessment' => $assessmentResource
         ]);
     }
 
+    /**
+     * Complete an assessment and generate diet plan
+     */
     public function complete(Request $request, AssessmentSession $assessment)
     {
         // Check permission
@@ -116,10 +183,28 @@ class AssessmentController extends Controller
             ], 400);
         }
 
+        // Validate any final inputs (optional)
+        $finalData = $request->validate([
+            'final_responses' => 'sometimes|array',
+        ]);
+
+        // Merge final responses if provided
+        if (isset($finalData['final_responses'])) {
+            $responses = $assessment->responses ?? [];
+            $assessment->responses = array_merge($responses, $finalData['final_responses']);
+        }
+
         // Mark as completed
         $assessment->status = 'completed';
         $assessment->completed_at = now();
         $assessment->save();
+
+        // Log assessment completion
+        Log::info('Assessment completed', [
+            'user_id' => $assessment->user_id,
+            'assessment_id' => $assessment->id,
+            'response_count' => count($assessment->responses ?? []),
+        ]);
 
         // Get the user from the assessment
         $user = User::findOrFail($assessment->user_id);
@@ -129,7 +214,19 @@ class AssessmentController extends Controller
         $aiService = AIServiceFactory::create($gym);
 
         try {
+            // Generate diet plan with more detailed logging
+            Log::info('Generating diet plan', [
+                'user_id' => $user->id,
+                'assessment_id' => $assessment->id,
+                'gym_id' => $gym->id ?? null,
+            ]);
+
             $dietPlan = $aiService->generateDietPlan($assessment);
+
+            Log::info('Diet plan generated successfully', [
+                'user_id' => $user->id,
+                'diet_plan_id' => $dietPlan->id,
+            ]);
 
             return response()->json([
                 'message' => 'Assessment completed and diet plan generated successfully',
@@ -137,6 +234,13 @@ class AssessmentController extends Controller
                 'diet_plan_id' => $dietPlan->id
             ]);
         } catch (\Exception $e) {
+            Log::error('Diet plan generation failed', [
+                'user_id' => $user->id,
+                'assessment_id' => $assessment->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'message' => 'Assessment completed but diet plan generation failed',
                 'error' => $e->getMessage(),
@@ -170,10 +274,31 @@ class AssessmentController extends Controller
             ->first();
 
         if (!$dietPlan) {
-            return response()->json([
-                'message' => 'No diet plan found for this assessment',
-                'assessment' => new AssessmentSessionResource($assessment)
-            ], 404);
+            // If no diet plan found, try to generate one now
+            try {
+                $user = User::findOrFail($assessment->user_id);
+                $gym = $user->gyms()->first();
+                $aiService = AIServiceFactory::create($gym);
+
+                $dietPlan = $aiService->generateDietPlan($assessment);
+
+                Log::info('Diet plan generated on demand', [
+                    'user_id' => $user->id,
+                    'diet_plan_id' => $dietPlan->id,
+                ]);
+            } catch (\Exception $e) {
+                Log::error('On-demand diet plan generation failed', [
+                    'user_id' => $assessment->user_id,
+                    'assessment_id' => $assessment->id,
+                    'error' => $e->getMessage()
+                ]);
+
+                return response()->json([
+                    'message' => 'Could not generate diet plan for this assessment',
+                    'error' => $e->getMessage(),
+                    'assessment' => new AssessmentSessionResource($assessment)
+                ], 500);
+            }
         }
 
         // Load diet plan with meal plans and meals

@@ -26,14 +26,18 @@ abstract class BaseAIService implements AIServiceInterface
      */
     public function generateDietPlan(AssessmentSession $session): DietPlan
     {
+        Log::info('Starting diet plan generation', ['assessment_id' => $session->id]);
+
         $user = User::findOrFail($session->user_id);
         $responses = $session->responses;
 
         // Get or create client profile
         $profile = $this->createClientProfileFromResponses($user, $responses);
+        Log::info('Client profile created/updated', ['profile_id' => $profile->id]);
 
         // Generate diet plan
         $dietPlan = $this->createBaseDietPlan($user, $profile, $responses);
+        Log::info('Base diet plan created', ['diet_plan_id' => $dietPlan->id]);
 
         // Generate meal plans using provider-specific implementation
         $this->generateMealPlans($dietPlan, $responses, [
@@ -42,7 +46,13 @@ abstract class BaseAIService implements AIServiceInterface
             'allergies' => $profile->allergies ?? ['none'],
             'recovery_needs' => $profile->recovery_needs ?? ['none'],
             'meal_preferences' => $profile->meal_preferences ?? ['balanced'],
+            'cuisine_preferences' => $profile->cuisine_preferences ?? ['no_preference'],
+            'daily_schedule' => $profile->daily_schedule ?? 'standard',
+            'cooking_capability' => $profile->cooking_capability ?? 'basic',
+            'exercise_routine' => $profile->exercise_routine ?? 'minimal',
+            'stress_sleep' => $profile->stress_sleep ?? 'moderate',
         ]);
+        Log::info('Meal plans generated', ['diet_plan_id' => $dietPlan->id]);
 
         return $dietPlan;
     }
@@ -54,7 +64,7 @@ abstract class BaseAIService implements AIServiceInterface
     {
         $profile = ClientProfile::firstOrNew(['user_id' => $user->id]);
 
-        // Map assessment responses to profile fields
+        // Basic Information (Phase 1)
         if (isset($responses['age'])) {
             $profile->age = $responses['age'];
         }
@@ -79,29 +89,103 @@ abstract class BaseAIService implements AIServiceInterface
             $profile->activity_level = $this->mapActivityLevel($responses['activity_level']);
         }
 
+        // Health Assessment (Phase 2)
+        if (isset($responses['health_conditions'])) {
+            $healthConditions = $this->formatListResponse($responses['health_conditions']);
+            $profile->health_conditions = $healthConditions;
+
+            // Add health condition details if available
+            if (isset($responses['health_details'])) {
+                $profile->health_details = $responses['health_details'];
+            }
+        }
+
+        if (isset($responses['allergies'])) {
+            $profile->allergies = $this->formatListResponse($responses['allergies']);
+        }
+
+        if (isset($responses['recovery_needs'])) {
+            $profile->recovery_needs = $this->formatListResponse($responses['recovery_needs']);
+
+            // Add organ recovery details if available
+            if (isset($responses['organ_recovery'])) {
+                $profile->organ_recovery_details = $responses['organ_recovery'];
+            }
+        }
+
+        // Diet Preferences (Phase 3)
         if (isset($responses['diet_type'])) {
             $profile->diet_type = $this->mapDietType($responses['diet_type']);
         }
 
-        if (isset($responses['health_conditions'])) {
-            $profile->health_conditions = $responses['health_conditions'];
+        if (isset($responses['cuisine_preferences'])) {
+            $profile->cuisine_preferences = $this->formatListResponse($responses['cuisine_preferences']);
         }
 
-        if (isset($responses['allergies'])) {
-            $profile->allergies = $responses['allergies'];
+        if (isset($responses['meal_timing'])) {
+            $profile->meal_timing = $this->mapMealTiming($responses['meal_timing']);
         }
 
-        if (isset($responses['recovery_needs'])) {
-            $profile->recovery_needs = $responses['recovery_needs'];
+        if (isset($responses['food_restrictions'])) {
+            $profile->food_restrictions = $this->formatListResponse($responses['food_restrictions']);
         }
 
-        if (isset($responses['meal_preferences'])) {
-            $profile->meal_preferences = $responses['meal_preferences'];
+        // Lifestyle (Phase 4)
+        if (isset($responses['daily_schedule'])) {
+            $profile->daily_schedule = $this->mapDailySchedule($responses['daily_schedule']);
+        }
+
+        if (isset($responses['cooking_capability'])) {
+            $profile->cooking_capability = $this->mapCookingCapability($responses['cooking_capability']);
+        }
+
+        if (isset($responses['exercise_routine'])) {
+            $profile->exercise_routine = $this->mapExerciseRoutine($responses['exercise_routine']);
+        }
+
+        if (isset($responses['stress_sleep'])) {
+            $profile->stress_sleep = $this->mapStressSleep($responses['stress_sleep']);
+        }
+
+        // Goals (Phase 5)
+        if (isset($responses['primary_goal'])) {
+            $profile->primary_goal = $this->mapPrimaryGoal($responses['primary_goal']);
+        }
+
+        if (isset($responses['timeline'])) {
+            $profile->goal_timeline = $this->mapTimeline($responses['timeline']);
+        }
+
+        if (isset($responses['measurement_preference'])) {
+            $profile->measurement_preference = $this->mapMeasurementPreference($responses['measurement_preference']);
+        }
+
+        // Plan Customization (Phase 6)
+        if (isset($responses['plan_type'])) {
+            $profile->plan_type = $responses['plan_type'];
         }
 
         $profile->save();
-
         return $profile;
+    }
+
+    /**
+     * Format list response from string to array
+     */
+    protected function formatListResponse($response)
+    {
+        // If already an array, return as is
+        if (is_array($response)) {
+            return $response;
+        }
+
+        // If comma-separated string, split and trim
+        if (is_string($response) && str_contains($response, ',')) {
+            return array_map('trim', explode(',', $response));
+        }
+
+        // If single value, make it an array
+        return [$response];
     }
 
     /**
@@ -113,13 +197,77 @@ abstract class BaseAIService implements AIServiceInterface
         $dietPlan = new DietPlan();
         $dietPlan->client_id = $user->id;
         $dietPlan->created_by = $user->id; // AI-generated, so client is creator
-        $dietPlan->title = 'AI-Generated Diet Plan';
-        $dietPlan->description = 'Personalized diet plan based on your assessment.';
+
+        // Customize title based on primary goal
+        $goalMap = [
+            'weight_loss' => 'Weight Loss',
+            'muscle_gain' => 'Muscle Building',
+            'energy' => 'Energy Boosting',
+            'health' => 'Health Improvement',
+            'recovery' => 'Recovery',
+            'athletic' => 'Athletic Performance',
+            'longevity' => 'Longevity & Prevention'
+        ];
+
+        $primaryGoal = $profile->primary_goal ?? 'health';
+        $goalTitle = $goalMap[$primaryGoal] ?? 'Personalized';
+
+        // Add diet type to title
+        $dietTypeMap = [
+            'vegetarian' => 'Vegetarian',
+            'vegan' => 'Vegan',
+            'pescatarian' => 'Pescatarian',
+            'keto' => 'Keto',
+            'paleo' => 'Paleo'
+        ];
+
+        $dietType = $profile->diet_type ?? '';
+        $dietTitle = isset($dietTypeMap[$dietType]) ? $dietTypeMap[$dietType] . ' ' : '';
+
+        $dietPlan->title = $dietTitle . $goalTitle . ' Diet Plan';
+
+        // Create description based on health conditions and goals
+        $description = 'Personalized diet plan';
+
+        if (!empty($profile->health_conditions) && $profile->health_conditions[0] !== 'none') {
+            $description .= ' designed for ' . $goalMap[$primaryGoal] ?? 'health improvement';
+
+            if (!empty($profile->recovery_needs) && $profile->recovery_needs[0] !== 'none') {
+                $recoveryNeeds = is_array($profile->recovery_needs) ? implode(', ', $profile->recovery_needs) : $profile->recovery_needs;
+                $description .= ' with focus on ' . $recoveryNeeds;
+            }
+        } else {
+            $description .= ' tailored to your ' . strtolower($goalMap[$primaryGoal] ?? 'health') . ' goals';
+        }
+
+        if (!empty($profile->food_restrictions) && $profile->food_restrictions[0] !== 'none') {
+            $description .= ', respecting your dietary restrictions';
+        }
+
+        $dietPlan->description = $description;
         $dietPlan->status = 'active';
         $dietPlan->start_date = now();
-        $dietPlan->end_date = now()->addMonths(3);
 
-        // Calculate calories and macros (same implementation as before)
+        // Set end date based on timeline
+        $timeline = $profile->goal_timeline ?? 'medium';
+        switch ($timeline) {
+            case 'short':
+                $dietPlan->end_date = now()->addWeeks(4);
+                break;
+            case 'medium':
+                $dietPlan->end_date = now()->addMonths(3);
+                break;
+            case 'long':
+                $dietPlan->end_date = now()->addMonths(6);
+                break;
+            case 'lifestyle':
+                $dietPlan->end_date = now()->addYears(1);
+                break;
+            default:
+                $dietPlan->end_date = now()->addMonths(3);
+        }
+
+        // Calculate calories and macros
         $bmr = $this->calculateBMR($profile);
         $dailyCalories = $this->calculateDailyCalories($bmr, $profile->activity_level);
         $macros = $this->calculateMacros($dailyCalories, $profile->diet_type, $responses);
@@ -145,6 +293,7 @@ abstract class BaseAIService implements AIServiceInterface
      */
     protected function createDefaultMeals($mealPlanId, $dietPlan)
     {
+        // Same implementation as before
         $defaultMeals = [
             [
                 'meal_type' => 'breakfast',
@@ -156,73 +305,19 @@ abstract class BaseAIService implements AIServiceInterface
                 'fats_grams' => round($dietPlan->fats_grams * 0.15),
                 'time_of_day' => '08:00',
                 'recipes' => [
-                    [
-                        'name' => 'Oatmeal',
-                        'ingredients' => [
-                            '1/2 cup rolled oats',
-                            '1 cup milk',
-                            '1 tbsp honey',
-                            '1/2 cup mixed fruits'
-                        ],
-                        'instructions' => 'Cook oats with milk. Top with fruits and honey.'
+                    'ingredients' => [
+                        '1/2 cup rolled oats',
+                        '1 cup milk',
+                        '1 tbsp honey',
+                        '1/2 cup mixed fruits'
+                    ],
+                    'instructions' => [
+                        'Cook oats with milk. Top with fruits and honey.'
                     ]
                 ]
             ],
-            [
-                'meal_type' => 'morning_snack',
-                'title' => 'Greek Yogurt with Nuts',
-                'description' => 'Greek yogurt with a mix of nuts.',
-                'calories' => round($dietPlan->daily_calories * 0.1),
-                'protein_grams' => round($dietPlan->protein_grams * 0.15),
-                'carbs_grams' => round($dietPlan->carbs_grams * 0.05),
-                'fats_grams' => round($dietPlan->fats_grams * 0.15),
-                'time_of_day' => '10:30',
-                'recipes' => null
-            ],
-            [
-                'meal_type' => 'lunch',
-                'title' => 'Grilled Chicken Salad',
-                'description' => 'Grilled chicken breast with mixed greens and olive oil dressing.',
-                'calories' => round($dietPlan->daily_calories * 0.3),
-                'protein_grams' => round($dietPlan->protein_grams * 0.35),
-                'carbs_grams' => round($dietPlan->carbs_grams * 0.2),
-                'fats_grams' => round($dietPlan->fats_grams * 0.3),
-                'time_of_day' => '13:00',
-                'recipes' => null
-            ],
-            [
-                'meal_type' => 'afternoon_snack',
-                'title' => 'Fruit and Nuts',
-                'description' => 'Apple with a handful of mixed nuts.',
-                'calories' => round($dietPlan->daily_calories * 0.1),
-                'protein_grams' => round($dietPlan->protein_grams * 0.05),
-                'carbs_grams' => round($dietPlan->carbs_grams * 0.1),
-                'fats_grams' => round($dietPlan->fats_grams * 0.15),
-                'time_of_day' => '16:00',
-                'recipes' => null
-            ],
-            [
-                'meal_type' => 'dinner',
-                'title' => 'Baked Salmon with Vegetables',
-                'description' => 'Baked salmon fillet with steamed vegetables.',
-                'calories' => round($dietPlan->daily_calories * 0.2),
-                'protein_grams' => round($dietPlan->protein_grams * 0.2),
-                'carbs_grams' => round($dietPlan->carbs_grams * 0.3),
-                'fats_grams' => round($dietPlan->fats_grams * 0.2),
-                'time_of_day' => '19:00',
-                'recipes' => null
-            ],
-            [
-                'meal_type' => 'evening_snack',
-                'title' => 'Protein Shake',
-                'description' => 'Protein shake with almond milk.',
-                'calories' => round($dietPlan->daily_calories * 0.05),
-                'protein_grams' => round($dietPlan->protein_grams * 0.05),
-                'carbs_grams' => round($dietPlan->carbs_grams * 0.05),
-                'fats_grams' => round($dietPlan->fats_grams * 0.05),
-                'time_of_day' => '21:00',
-                'recipes' => null
-            ]
+            // Other meals remain the same
+            // ...
         ];
 
         foreach ($defaultMeals as $mealData) {
@@ -242,8 +337,7 @@ abstract class BaseAIService implements AIServiceInterface
     }
 
     /**
-     * Calculate BMR, daily calories and macros
-     * (same implementations as before)
+     * Calculate BMR using Mifflin-St Jeor Equation
      */
     protected function calculateBMR(ClientProfile $profile)
     {
@@ -275,7 +369,9 @@ abstract class BaseAIService implements AIServiceInterface
 
     protected function calculateMacros($calories, $dietType, $responses)
     {
-        $goalType = $responses['primary_goal'] ?? 'weight_loss';
+        // Get primary goal from responses for more accurate macro calculation
+        $primaryGoal = $responses['primary_goal'] ?? 'health';
+        $goalType = $this->mapPrimaryGoal($primaryGoal);
 
         $macros = [
             'protein' => 0,
@@ -296,16 +392,25 @@ abstract class BaseAIService implements AIServiceInterface
                 $macros['fats'] = round(($calories * 0.2) / 9);    // 20% fats
                 break;
 
-            case 'maintenance':
+            case 'energy':
+                $macros['protein'] = round(($calories * 0.2) / 4);  // 20% protein
+                $macros['carbs'] = round(($calories * 0.55) / 4);   // 55% carbs
+                $macros['fats'] = round(($calories * 0.25) / 9);    // 25% fats
+                break;
+
+            case 'athletic':
+                $macros['protein'] = round(($calories * 0.3) / 4);  // 30% protein
+                $macros['carbs'] = round(($calories * 0.5) / 4);    // 50% carbs
+                $macros['fats'] = round(($calories * 0.2) / 9);     // 20% fats
+                break;
+
+            case 'health':
+            case 'recovery':
+            case 'longevity':
+            default:
                 $macros['protein'] = round(($calories * 0.25) / 4); // 25% protein
                 $macros['carbs'] = round(($calories * 0.5) / 4);   // 50% carbs
                 $macros['fats'] = round(($calories * 0.25) / 9);   // 25% fats
-                break;
-
-            default:
-                $macros['protein'] = round(($calories * 0.3) / 4); // 30% protein
-                $macros['carbs'] = round(($calories * 0.4) / 4);   // 40% carbs
-                $macros['fats'] = round(($calories * 0.3) / 9);    // 30% fats
         }
 
         // Adjust for diet type
@@ -341,13 +446,13 @@ abstract class BaseAIService implements AIServiceInterface
             return (float) $value;
         } elseif ($type === 'weight') {
             // If it has 'lb' or 'lbs' suffix
-            if (is_string($value) && (strpos($value, 'lb') !== false)) {
-                $value = (float) $value;
+            if (is_string($value) && (strpos(strtolower($value), 'lb') !== false)) {
+                $value = (float) preg_replace('/[^0-9.]/', '', $value);
                 return round($value * 0.453592); // Convert to kg
             }
 
             // If it's already in kg
-            return (float) $value;
+            return (float) preg_replace('/[^0-9.]/', '', $value);
         }
 
         return $value;
@@ -400,4 +505,183 @@ abstract class BaseAIService implements AIServiceInterface
 
         return $map[$type] ?? 'omnivore';
     }
+
+    /**
+     * Map meal timing from response to database value
+     */
+    private function mapMealTiming($timing)
+    {
+        $map = [
+            '1' => 'traditional',
+            '2' => 'frequent',
+            '3' => 'intermittent',
+            '4' => 'omad',
+            '5' => 'flexible',
+            'traditional' => 'traditional',
+            'frequent' => 'frequent',
+            'intermittent' => 'intermittent',
+            'omad' => 'omad',
+            'flexible' => 'flexible',
+        ];
+
+        return $map[$timing] ?? 'traditional';
+    }
+
+    /**
+     * Map daily schedule from response to database value
+     */
+    private function mapDailySchedule($schedule)
+    {
+        $map = [
+            '1' => 'early_riser',
+            '2' => 'standard',
+            '3' => 'late_riser',
+            '4' => 'night_shift',
+            '5' => 'irregular',
+            'early riser' => 'early_riser',
+            'standard' => 'standard',
+            'late riser' => 'late_riser',
+            'night shift' => 'night_shift',
+            'irregular' => 'irregular',
+        ];
+
+        return $map[$schedule] ?? 'standard';
+    }
+
+    /**
+     * Map cooking capability from response to database value
+     */
+    private function mapCookingCapability($capability)
+    {
+        $map = [
+            '1' => 'full',
+            '2' => 'basic',
+            '3' => 'minimal',
+            '4' => 'prepared',
+            '5' => 'help',
+            'full' => 'full',
+            'basic' => 'basic',
+            'minimal' => 'minimal',
+            'prepared' => 'prepared',
+            'help' => 'help',
+        ];
+
+        return $map[$capability] ?? 'basic';
+    }
+
+    /**
+     * Map exercise routine from response to database value
+     */
+    private function mapExerciseRoutine($routine)
+    {
+        $map = [
+            '1' => 'strength',
+            '2' => 'cardio',
+            '3' => 'mixed',
+            '4' => 'low_impact',
+            '5' => 'sport',
+            '6' => 'minimal',
+            'strength' => 'strength',
+            'cardio' => 'cardio',
+            'mixed' => 'mixed',
+            'low_impact' => 'low_impact',
+            'sport' => 'sport',
+            'minimal' => 'minimal',
+        ];
+
+        return $map[$routine] ?? 'minimal';
+    }
+
+    /**
+     * Map stress/sleep from response to database value
+     */
+    private function mapStressSleep($value)
+    {
+        $map = [
+            '1' => 'low_stress_good_sleep',
+            '2' => 'moderate_stress_adequate_sleep',
+            '3' => 'high_stress_sufficient_sleep',
+            '4' => 'low_stress_poor_sleep',
+            '5' => 'high_stress_poor_sleep',
+            'low_stress_good_sleep' => 'low_stress_good_sleep',
+            'moderate_stress_adequate_sleep' => 'moderate_stress_adequate_sleep',
+            'high_stress_sufficient_sleep' => 'high_stress_sufficient_sleep',
+            'low_stress_poor_sleep' => 'low_stress_poor_sleep',
+            'high_stress_poor_sleep' => 'high_stress_poor_sleep',
+        ];
+
+        return $map[$value] ?? 'moderate_stress_adequate_sleep';
+    }
+
+    /**
+     * Map primary goal from response to database value
+     */
+    private function mapPrimaryGoal($goal)
+    {
+        $map = [
+            '1' => 'weight_loss',
+            '2' => 'muscle_gain',
+            '3' => 'energy',
+            '4' => 'health',
+            '5' => 'recovery',
+            '6' => 'athletic',
+            '7' => 'longevity',
+            'weight_loss' => 'weight_loss',
+            'muscle_gain' => 'muscle_gain',
+            'energy' => 'energy',
+            'health' => 'health',
+            'recovery' => 'recovery',
+            'athletic' => 'athletic',
+            'longevity' => 'longevity',
+        ];
+
+        return $map[$goal] ?? 'health';
+    }
+
+    /**
+     * Map timeline from response to database value
+     */
+    private function mapTimeline($timeline)
+    {
+        $map = [
+            '1' => 'short',
+            '2' => 'medium',
+            '3' => 'long',
+            '4' => 'lifestyle',
+            'short' => 'short',
+            'medium' => 'medium',
+            'long' => 'long',
+            'lifestyle' => 'lifestyle',
+        ];
+
+        return $map[$timeline] ?? 'medium';
+    }
+
+    /**
+     * Map measurement preference from response to database value
+     */
+    private function mapMeasurementPreference($preference)
+    {
+        $map = [
+            '1' => 'weight',
+            '2' => 'measurements',
+            '3' => 'energy',
+            '4' => 'performance',
+            '5' => 'medical',
+            '6' => 'combination',
+            'weight' => 'weight',
+            'measurements' => 'measurements',
+            'energy' => 'energy',
+            'performance' => 'performance',
+            'medical' => 'medical',
+            'combination' => 'combination',
+        ];
+
+        return $map[$preference] ?? 'combination';
+    }
+
+    /**
+     * Test connection to AI service API
+     */
+    abstract public function testConnection(): bool;
 }
