@@ -48,4 +48,29 @@ class Meal extends Model
 
         return $displayNames[$this->meal_type] ?? $this->meal_type;
     }
+
+    /**
+     * Get the nutrition information for the meal.
+     */
+    public function nutritionInfo()
+    {
+        return $this->hasOne(NutritionInfo::class);
+    }
+
+    /**
+     * Get the structured ingredients for the meal.
+     */
+    public function ingredients()
+    {
+        return $this->hasMany(RecipeIngredient::class);
+    }
+
+    /**
+     * Get the meal compliance records for the meal.
+     */
+    public function complianceRecords()
+    {
+        return $this->hasMany(MealCompliance::class);
+    }
+
 }

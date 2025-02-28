@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
             ClientProfileSeeder::class,
             DietPlanSeeder::class,
+            AttributeSeeder::class
         ]);
     }
 }

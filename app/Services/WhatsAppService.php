@@ -18,6 +18,10 @@ class WhatsAppService
     protected $apiUrl;
     protected $phoneNumberId;
 
+    protected $groceryListService;
+    protected $nutritionInfoService;
+    protected $progressTrackingService;
+
     // Define the assessment flow structure
     protected $assessmentFlow = [
         'phases' => [
@@ -384,11 +388,20 @@ class WhatsAppService
         ]
     ];
 
-    public function __construct()
-    {
+    public function __construct(
+        GroceryListService $groceryListService = null,
+        NutritionInfoService $nutritionInfoService = null,
+        WhatsAppProgressTrackingService $progressTrackingService = null
+    ) {
         $this->apiKey = config('services.whatsapp.api_key');
         $this->apiUrl = config('services.whatsapp.api_url');
         $this->phoneNumberId = config('services.whatsapp.phone_number_id');
+
+        // Initialize services or create them if null
+        $this->groceryListService = $groceryListService ?? app(GroceryListService::class);
+        $this->nutritionInfoService = $nutritionInfoService ?? app(NutritionInfoService::class);
+        $this->progressTrackingService = $progressTrackingService ?? app(WhatsAppProgressTrackingService::class);
+
     }
 
     /**
@@ -410,6 +423,7 @@ class WhatsAppService
         // Otherwise, check for commands
         $lowerContent = strtolower(trim($content));
 
+        // First, check for standard commands
         if ($lowerContent === 'start' || $lowerContent === 'begin' || $lowerContent === 'hi' || $lowerContent === 'hello') {
             // Start new assessment
             return $this->startAssessment($user);
@@ -419,12 +433,52 @@ class WhatsAppService
             return $this->sendCurrentPlan($user);
         } elseif ($lowerContent === 'progress') {
             return $this->sendProgressUpdate($user);
-        } else {
-            // Default response
-            $this->sendTextMessage($user->whatsapp_phone, "I'm not sure what you mean. Type 'help' for a list of commands or 'start' to begin a new assessment.");
+        } elseif (Str::startsWith($lowerContent, 'day ')) {
+            $day = trim(substr($lowerContent, 4));
+            return $this->sendDayMealPlan($user, $this->getCurrentDietPlan($user), $day);
+        }
+
+        // Check for grocery list commands
+        $groceryResponse = $this->groceryListService->processGroceryCommand($user, $lowerContent);
+        if ($groceryResponse !== null) {
+            $this->sendTextMessage($user->whatsapp_phone, $groceryResponse);
             return null;
         }
+
+        // Check for nutrition commands
+        $nutritionResponse = $this->nutritionInfoService->processNutritionCommand($user, $lowerContent);
+        if ($nutritionResponse !== null) {
+            $this->sendTextMessage($user->whatsapp_phone, $nutritionResponse);
+            return null;
+        }
+
+        // Check for progress tracking commands
+        $progressResponse = $this->progressTrackingService->processProgressCommand($user, $lowerContent);
+        if ($progressResponse !== null) {
+            $this->sendTextMessage($user->whatsapp_phone, $progressResponse);
+            return null;
+        }
+
+        // Check for recipe commands
+        if (Str::startsWith($lowerContent, 'recipe ')) {
+            $params = explode(' ', substr($lowerContent, 7), 2);
+            if (count($params) == 2) {
+                return $this->sendRecipe($user, $params[0], $params[1]);
+            }
+        }
+
+        // Check for calendar commands
+        if ($lowerContent === 'calendar sync' || $lowerContent === 'sync calendar') {
+            $syncResult = $this->progressTrackingService->createCalendarEntries($user);
+            $this->sendTextMessage($user->whatsapp_phone, $syncResult);
+            return null;
+        }
+
+        // Default response
+        $this->sendTextMessage($user->whatsapp_phone, "I'm not sure what you mean. Type 'help' for a list of commands or 'start' to begin a new assessment.");
+        return null;
     }
+
 
     /**
      * Start a new assessment session
@@ -1013,7 +1067,41 @@ class WhatsAppService
         $message .= "• *help* - Show this help message\n\n";
         $message .= "Reply anytime with your question or concern, and I'll do my best to assist you!";
 
+        // Nutrition commands
+        $message .= "*Nutrition:*\n";
+        $message .= "• *nutrition [meal] [day]* - Get detailed nutrition for a meal\n";
+        $message .= "• *macros [day]* - View macronutrient summary for a day\n";
+        $message .= "• *calories* - View your daily calorie target\n\n";
+
+        // Grocery list commands
+        $message .= "*Grocery List:*\n";
+        $message .= "• *grocery* - Show your current grocery list\n";
+        $message .= "• *bought [item]* - Mark an item as purchased\n";
+        $message .= "• *reset grocery* - Reset your grocery list\n\n";
+
+        // Progress tracking commands
+        $message .= "*Progress Tracking:*\n";
+        $message .= "• *checkin* - Start daily check-in process\n";
+        $message .= "• *progress* - View your progress report\n";
+        $message .= "• *weight [value]* - Log your current weight\n";
+        $message .= "• *water [amount]* - Log your water intake\n";
+        $message .= "• *meal done* - Mark a meal as completed\n";
+        $message .= "• *exercise done* - Log exercise completion\n\n";
+
+        // Goal tracking commands
+        $message .= "*Goal Tracking:*\n";
+        $message .= "• *goal* - View your active goals\n";
+        $message .= "• *goal new [description]* - Create a new goal\n";
+        $message .= "• *goal update [value]* - Update goal progress\n\n";
+
+        // Calendar commands
+        $message .= "*Calendar:*\n";
+        $message .= "• *calendar sync* - Sync meal plan to calendar\n\n";
+
+        $message .= "Reply anytime with your question or concern, and I'll do my best to assist you!";
+
         $this->sendTextMessage($user->whatsapp_phone, $message);
+
     }
 
     /**
@@ -1184,4 +1272,82 @@ class WhatsAppService
             return false;
         }
     }
+
+    private function getCurrentDietPlan(User $user): ?DietPlan
+    {
+        return DietPlan::where('client_id', $user->id)
+            ->where('status', 'active')
+            ->latest()
+            ->first();
+    }
+
+    private function sendRecipe(User $user, string $mealType, string $day): ?string
+    {
+        $dietPlan = $this->getCurrentDietPlan($user);
+
+        if (!$dietPlan) {
+            $this->sendTextMessage($user->whatsapp_phone, "You don't have an active diet plan. Type 'start' to begin the assessment process.");
+            return null;
+        }
+
+        // Find the meal
+        $mealPlan = $dietPlan->mealPlans()->where('day_of_week', $day)->first();
+
+        if (!$mealPlan) {
+            $this->sendTextMessage($user->whatsapp_phone, "I couldn't find a meal plan for {$day}.");
+            return null;
+        }
+
+        $meal = $mealPlan->meals()->where('meal_type', $mealType)->first();
+
+        if (!$meal) {
+            $this->sendTextMessage($user->whatsapp_phone, "I couldn't find a {$mealType} meal for {$day}.");
+            return null;
+        }
+
+        // Format recipe message
+        $recipes = $meal->recipes;
+
+        // Handle both string (JSON) and array representations
+        if (is_string($recipes)) {
+            $recipes = json_decode($recipes, true);
+        }
+
+        if (!$recipes || !isset($recipes['ingredients']) || !is_array($recipes['ingredients'])) {
+            $this->sendTextMessage($user->whatsapp_phone, "No recipe found for this meal.");
+            return null;
+        }
+
+        $message = "🍳 *Recipe: {$meal->title}* 🍳\n\n";
+        $message .= "{$meal->description}\n\n";
+
+        $message .= "*Ingredients:*\n";
+        foreach ($recipes['ingredients'] as $ingredient) {
+            $message .= "• {$ingredient}\n";
+        }
+
+        $message .= "\n*Instructions:*\n";
+        if (isset($recipes['instructions']) && is_array($recipes['instructions'])) {
+            $step = 1;
+            foreach ($recipes['instructions'] as $instruction) {
+                $message .= "{$step}. {$instruction}\n";
+                $step++;
+            }
+        } else {
+            $message .= "Simple preparation: Combine ingredients and cook to your preference.";
+        }
+
+        // Add nutrition information
+        $message .= "\n\n*Nutrition Information:*\n";
+        $message .= "Calories: {$meal->calories} kcal | P: {$meal->protein_grams}g | C: {$meal->carbs_grams}g | F: {$meal->fats_grams}g\n\n";
+        $message .= "Type 'nutrition {$mealType} {$day}' for detailed nutrition breakdown.";
+
+        // Add grocery list suggestion
+        $message .= "\n\nType 'grocery' to add these ingredients to your shopping list.";
+
+        $this->sendTextMessage($user->whatsapp_phone, $message);
+        return null;
+    }
+
+
 }

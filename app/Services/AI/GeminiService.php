@@ -36,21 +36,48 @@ class GeminiService extends BaseAIService
     }
 
     /**
-     * Generate meal plans using Gemini
-     * Modified to use a queueing system for scalability
+     * Generate meal plans using Gemini - modified to handle single day case
      */
     public function generateMealPlans(DietPlan $dietPlan, array $responses, array $preferences): bool
     {
+        // Check if we're generating for a specific day only
+        $specificDay = $preferences['day'] ?? null;
+        $specificMealPlanId = $preferences['meal_plan_id'] ?? null;
+
+        if ($specificDay && $specificMealPlanId) {
+            // Single day generation case (from job)
+            $mealPlan = MealPlan::findOrFail($specificMealPlanId);
+
+            try {
+                $this->generateMealsForDay($mealPlan, $dietPlan, $preferences['profile'], $responses, $preferences, $specificDay);
+                Log::info("Meal plan generated for {$specificDay}", ['diet_plan_id' => $dietPlan->id]);
+                return true;
+            } catch (Exception $e) {
+                Log::error("Error generating meal plan for {$specificDay}", ['error' => $e->getMessage(), 'diet_plan_id' => $dietPlan->id]);
+                $this->createDefaultMeals($mealPlan->id, $dietPlan);
+                return false;
+            }
+        }
+
         // First, create meal plan for Monday immediately for instant feedback
         $monday = 'monday';
-        $mealPlan = MealPlan::create(['diet_plan_id' => $dietPlan->id, 'day_of_week' => $monday]);
+        $mealPlan = MealPlan::create([
+            'diet_plan_id' => $dietPlan->id,
+            'day_of_week' => $monday,
+            'generation_status' => 'in_progress'
+        ]);
 
         try {
             $this->generateMealsForDay($mealPlan, $dietPlan, $preferences['profile'], $responses, $preferences, $monday);
+            $mealPlan->generation_status = 'completed';
+            $mealPlan->calculateTotals();
+            $mealPlan->save();
             Log::info('Monday meal plan generated immediately', ['diet_plan_id' => $dietPlan->id]);
         } catch (Exception $e) {
             Log::error('Error generating Monday meal plan', ['error' => $e->getMessage(), 'diet_plan_id' => $dietPlan->id]);
             $this->createDefaultMeals($mealPlan->id, $dietPlan);
+            $mealPlan->generation_status = 'failed';
+            $mealPlan->save();
         }
 
         // Queue the generation of the remaining days with progressive delays
@@ -58,7 +85,11 @@ class GeminiService extends BaseAIService
 
         foreach ($remainingDays as $index => $day) {
             // Create the meal plan record immediately, we'll populate meals later
-            $newMealPlan = MealPlan::create(['diet_plan_id' => $dietPlan->id, 'day_of_week' => $day]);
+            $newMealPlan = MealPlan::create([
+                'diet_plan_id' => $dietPlan->id,
+                'day_of_week' => $day,
+                'generation_status' => 'pending'
+            ]);
 
             // Default meals as placeholders
             $this->createDefaultMeals($newMealPlan->id, $dietPlan);
@@ -88,7 +119,6 @@ class GeminiService extends BaseAIService
 
         return true;
     }
-
     /**
      * Generate meals for a specific day
      * Can be called directly or from a queued job
