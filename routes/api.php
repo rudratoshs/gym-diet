@@ -10,6 +10,11 @@ use App\Http\Controllers\Api\MealController;
 use App\Http\Controllers\Api\AssessmentController;
 use App\Http\Controllers\Api\AIConfigurationController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
+use App\Http\Controllers\Api\ClientSubscriptionController;
+use App\Http\Controllers\Api\SubscriptionPlanController;
+use App\Http\Controllers\Api\GymSubscriptionPlanController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\PaymentWebhookController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
@@ -85,4 +90,49 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/gyms/{gym}/ai-configurations/{configuration}', [AIConfigurationController::class, 'destroy']);
     Route::post('/gyms/{gym}/ai-configurations/{configuration}/test', [AIConfigurationController::class, 'test']);
 
+    // Platform Subscription Plans routes (admin only)
+    Route::middleware('permission:manage_subscription_plans')->group(function () {
+        Route::get('/subscription-plans', [SubscriptionPlanController::class, 'index']);
+        Route::post('/subscription-plans', [SubscriptionPlanController::class, 'store']);
+        Route::get('/subscription-plans/{subscriptionPlan}', [SubscriptionPlanController::class, 'show']);
+        Route::put('/subscription-plans/{subscriptionPlan}', [SubscriptionPlanController::class, 'update']);
+        Route::delete('/subscription-plans/{subscriptionPlan}', [SubscriptionPlanController::class, 'destroy']);
+    });
+
+    // Public subscription plans endpoint (available to all authenticated users)
+    Route::get('/public-subscription-plans', [SubscriptionPlanController::class, 'publicPlans']);
+
+    // Gym Subscription routes
+    Route::get('/gyms/{gym}/subscription', [SubscriptionController::class, 'show'])->middleware('permission:view_gyms');
+    Route::post('/gyms/{gym}/subscribe', [SubscriptionController::class, 'subscribe'])->middleware('permission:edit_gyms');
+    Route::put('/gyms/{gym}/subscription', [SubscriptionController::class, 'update'])->middleware('permission:edit_gyms');
+    Route::post('/gyms/{gym}/subscription/cancel', [SubscriptionController::class, 'cancel'])->middleware('permission:edit_gyms');
+
+    // Gym Subscription Plans for clients
+    Route::get('/gyms/{gym}/subscription-plans', [GymSubscriptionPlanController::class, 'index'])->middleware('permission:view_gyms');
+    Route::post('/gyms/{gym}/subscription-plans', [GymSubscriptionPlanController::class, 'store'])->middleware('permission:edit_gyms');
+    Route::get('/gyms/{gym}/subscription-plans/{plan}', [GymSubscriptionPlanController::class, 'show'])->middleware('permission:view_gyms');
+    Route::put('/gyms/{gym}/subscription-plans/{plan}', [GymSubscriptionPlanController::class, 'update'])->middleware('permission:edit_gyms');
+    Route::delete('/gyms/{gym}/subscription-plans/{plan}', [GymSubscriptionPlanController::class, 'destroy'])->middleware('permission:edit_gyms');
+
+    // Public gym subscription plans endpoint (available to gym clients)
+    Route::get('/gyms/{gym}/public-subscription-plans', [GymSubscriptionPlanController::class, 'publicPlans']);
+
+    // Client Subscription routes
+    Route::middleware('permission:view_clients')->get('/client-subscriptions', [ClientSubscriptionController::class, 'index']);
+    Route::middleware('permission:edit_clients')->post('/client-subscriptions', [ClientSubscriptionController::class, 'store']);
+    Route::middleware('permission:view_clients')->get('/client-subscriptions/{clientSubscription}', [ClientSubscriptionController::class, 'show']);
+    Route::middleware('permission:edit_clients')->put('/client-subscriptions/{clientSubscription}', [ClientSubscriptionController::class, 'update']);
+    Route::middleware('permission:edit_clients')->delete('/client-subscriptions/{clientSubscription}', [ClientSubscriptionController::class, 'destroy']);
+
+    // Client self-subscription route
+    Route::post('/users/{user}/subscribe', [ClientSubscriptionController::class, 'subscribe']);
+
+    // Feature-gated routes example (using subscription.feature middleware)
+    Route::post('/diet-plans/{dietPlan}/meal-plans/{mealPlan}/generate-ai', [MealPlanController::class, 'generateWithAI'])
+        ->middleware(['permission:edit_diet_plans', 'subscription.feature:ai_meal_generation']);
+
 });
+// Payment webhook routes (public)
+Route::post('/webhooks/stripe', [PaymentWebhookController::class, 'handleStripe']);
+Route::post('/webhooks/razorpay', [PaymentWebhookController::class, 'handleRazorpay']);

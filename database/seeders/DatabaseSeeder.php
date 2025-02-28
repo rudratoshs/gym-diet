@@ -18,7 +18,9 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
             ClientProfileSeeder::class,
             DietPlanSeeder::class,
-            AttributeSeeder::class
+            AttributeSeeder::class,
+            SubscriptionFeaturesSeeder::class,
+            SubscriptionPlansSeeder::class,
         ]);
     }
 }
