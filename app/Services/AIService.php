@@ -149,7 +149,7 @@ class AIService
     /**
      * Generate meals for a meal plan
      */
-    private function generateMeals(MealPlan $mealPlan, DietPlan $dietPlan, ClientProfile $profile, array $responses, string $day)
+    public function generateMeals(MealPlan $mealPlan, DietPlan $dietPlan, ClientProfile $profile, array $responses, string $day)
     {
         // Format the prompt for OpenAI
         $prompt = $this->formatMealPrompt($dietPlan, $profile, $responses, $day);

@@ -67,4 +67,69 @@ class Gym extends Model
             ?? $this->aiConfigurations()->where('is_active', true)->first();
     }
 
+    /**
+     * Check if the gym is owned by the specified user.
+     *
+     * @param User $user
+     * @return bool
+     */
+    public function isOwnedBy(User $user)
+    {
+        return $this->owner_id === $user->id;
+    }
+
+    /**
+     * Get the active subscription for the gym.
+     */
+    public function subscription()
+    {
+        return $this->hasOne(Subscription::class)
+            ->where('status', 'active')
+            ->where('current_period_end', '>', now())
+            ->latest();
+    }
+
+    /**
+     * Get all subscriptions for the gym.
+     */
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * Get the subscription plans created by this gym for its clients.
+     */
+    public function subscriptionPlans()
+    {
+        return $this->hasMany(GymSubscriptionPlan::class);
+    }
+
+    /**
+     * Get the client subscriptions for this gym.
+     */
+    public function clientSubscriptions()
+    {
+        return $this->hasMany(ClientSubscription::class);
+    }
+
+    /**
+     * Get the subscription feature usage records for this gym.
+     */
+    public function featureUsage()
+    {
+        return $this->hasMany(SubscriptionFeatureUsage::class);
+    }
+
+    /**
+     * Check if the gym has an active subscription.
+     *
+     * @return bool
+     */
+    public function hasActiveSubscription()
+    {
+        return $this->subscription_status === 'active' &&
+            ($this->subscription_expires_at === null || $this->subscription_expires_at > now());
+    }
+
 }

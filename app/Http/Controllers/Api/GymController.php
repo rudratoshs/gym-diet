@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\GymResource;
 use App\Http\Resources\UserResource;
+use App\Http\Resources\SubscriptionResource;
 use App\Models\Gym;
 use App\Models\User;
+use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -14,8 +16,18 @@ use Illuminate\Support\Facades\Gate;
 
 class GymController extends Controller
 {
+    protected $subscriptionService;
+
+    /**
+     * Create a new controller instance.
+     *
+     * @param  \App\Services\SubscriptionService  $subscriptionService
+     * @return void
+     */
     public function __construct()
     {
+        $this->subscriptionService = $subscriptionService ?? app(SubscriptionService::class);
+
     }
 
     /**
@@ -54,13 +66,15 @@ class GymController extends Controller
         ]);
 
         $user = $request->user();
-
-        // Create gym with current user as owner
-        $gym = new Gym($validated);
-        $gym->owner_id = $user->id;
-        $gym->subscription_status = 'trial';
-        $gym->subscription_expires_at = now()->addDays(30);
-        $gym->save();
+        $gym = Gym::create([
+            'name' => $request->name,
+            'address' => $request->address,
+            'phone' => $request->phone,
+            'email' => $request->email,
+            'owner_id' => $user->id,
+            'subscription_status' => 'trial',
+            'subscription_expires_at' => now()->addDays(14), // 14-day trial
+        ]);
 
         // Add owner as gym_admin
         $gym->users()->attach($user->id, [
@@ -156,6 +170,16 @@ class GymController extends Controller
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
 
+        // Check subscription limits for client addition
+        if ($request->role === 'client') {
+            // Check if gym can add more clients
+            if (!$this->subscriptionService->canAddMoreClients($gym->id)) {
+                return response()->json([
+                    'error' => 'You have reached the maximum number of clients allowed by your subscription plan.'
+                ], 403);
+            }
+        }
+
         // Check if user is already in the gym
         $existingUser = $gym->users()->where('user_id', $validated['user_id'])->first();
 
@@ -207,4 +231,30 @@ class GymController extends Controller
 
         return response()->json(['message' => 'User removed from gym']);
     }
+
+    /**
+     * Get the gym's subscription information.
+     *
+     * @param  \App\Models\Gym  $gym
+     * @return \Illuminate\Http\Response
+     */
+    public function subscription(Gym $gym)
+    {
+        $subscription = $this->subscriptionService->getActiveSubscription($gym->id);
+
+        if (!$subscription) {
+            return response()->json([
+                'status' => $gym->subscription_status,
+                'expires_at' => $gym->subscription_expires_at,
+                'has_active_subscription' => false,
+                'message' => 'No active subscription found'
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'active subscription',
+            'subscription' => new SubscriptionResource($subscription)
+        ]);
+    }
+
 }

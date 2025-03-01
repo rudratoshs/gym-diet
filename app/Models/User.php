@@ -20,6 +20,8 @@ class User extends Authenticatable
         'whatsapp_phone',
         'whatsapp_id',
         'status',
+        'stripe_customer_id',
+        'razorpay_customer_id',
     ];
 
     protected $hidden = [
@@ -117,4 +119,54 @@ class User extends Authenticatable
     {
         return $this->hasOne(DashboardPreferences::class);
     }
+
+    /**
+     * Check if user belongs to the specified gym.
+     *
+     * @param int $gymId
+     * @param array $roles
+     * @return bool
+     */
+    public function belongsToGym($gymId, array $roles = [])
+    {
+        $query = $this->gyms()->where('gyms.id', $gymId);
+
+        if (!empty($roles)) {
+            $query->wherePivotIn('role', $roles);
+        }
+
+        return $query->exists();
+    }
+
+    /**
+     * Get the client subscriptions for this user.
+     */
+    public function clientSubscriptions()
+    {
+        return $this->hasMany(ClientSubscription::class);
+    }
+
+    /**
+     * Get active client subscriptions for this user.
+     */
+    public function activeClientSubscriptions()
+    {
+        return $this->clientSubscriptions()
+            ->where('status', 'active')
+            ->where('end_date', '>', now());
+    }
+
+    /**
+     * Check if user has an active subscription to the gym.
+     *
+     * @param int $gymId
+     * @return bool
+     */
+    public function hasActiveSubscriptionToGym($gymId)
+    {
+        return $this->activeClientSubscriptions()
+            ->where('gym_id', $gymId)
+            ->exists();
+    }
+
 }

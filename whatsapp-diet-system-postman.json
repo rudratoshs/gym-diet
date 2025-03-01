@@ -2006,6 +2006,978 @@
 					}
 				}
 			]
-		}
+		},
+		{
+			"name": "Subscriptions",
+			"item": [
+			  {
+				"name": "Platform Subscription Plans",
+				"item": [
+				  {
+					"name": "List Subscription Plans",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "GET",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/subscription-plans",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "subscription-plans"
+						]
+					  },
+					  "description": "Get list of platform subscription plans (admin only)"
+					}
+				  },
+				  {
+					"name": "Get Public Subscription Plans",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "GET",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/public-subscription-plans",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "public-subscription-plans"
+						]
+					  },
+					  "description": "Get list of publicly available subscription plans"
+					}
+				  },
+				  {
+					"name": "Create Subscription Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "POST",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"name\": \"Starter Plan\",\n    \"code\": \"starter\",\n    \"description\": \"Basic plan for small gyms with up to 50 clients.\",\n    \"monthly_price\": 49.99,\n    \"quarterly_price\": 134.97,\n    \"annual_price\": 479.90,\n    \"features\": {\n        \"max_clients\": 50,\n        \"max_diet_plans\": 2,\n        \"ai_meal_generation\": true,\n        \"ai_meal_generation_limit\": 50\n    },\n    \"is_active\": true\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/subscription-plans",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "subscription-plans"
+						]
+					  },
+					  "description": "Create a new subscription plan (admin only)"
+					}
+				  },
+				  {
+					"name": "Get Subscription Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "GET",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/subscription-plans/1",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "subscription-plans",
+						  "1"
+						]
+					  },
+					  "description": "Get subscription plan details"
+					}
+				  },
+				  {
+					"name": "Update Subscription Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "PUT",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"name\": \"Updated Starter Plan\",\n    \"monthly_price\": 59.99,\n    \"features\": {\n        \"max_clients\": 75,\n        \"max_diet_plans\": 3,\n        \"ai_meal_generation\": true,\n        \"ai_meal_generation_limit\": 100\n    }\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/subscription-plans/1",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "subscription-plans",
+						  "1"
+						]
+					  },
+					  "description": "Update subscription plan details (admin only)"
+					}
+				  },
+				  {
+					"name": "Delete Subscription Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "DELETE",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/subscription-plans/1",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "subscription-plans",
+						  "1"
+						]
+					  },
+					  "description": "Delete subscription plan (admin only)"
+					}
+				  }
+				],
+				"description": "Platform subscription plan management"
+			  },
+			  {
+				"name": "Gym Subscriptions",
+				"item": [
+				  {
+					"name": "Get Gym Subscription",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "GET",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/subscription",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "subscription"
+						]
+					  },
+					  "description": "Get gym's active subscription"
+					}
+				  },
+				  {
+					"name": "Subscribe Gym to Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "POST",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"plan_id\": 1,\n    \"billing_cycle\": \"monthly\",\n    \"payment_provider\": \"stripe\",\n    \"payment_method_id\": \"pm_test_stripe_payment_method\",\n    \"payment_data\": {}\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/subscribe",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "subscribe"
+						]
+					  },
+					  "description": "Subscribe gym to a platform plan"
+					}
+				  },
+				  {
+					"name": "Update Gym Subscription",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "PUT",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"plan_id\": 2,\n    \"payment_method_id\": \"pm_new_payment_method\"\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/subscription",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "subscription"
+						]
+					  },
+					  "description": "Update gym's subscription plan or payment method"
+					}
+				  },
+				  {
+					"name": "Cancel Gym Subscription",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "POST",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"at_period_end\": true\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/subscription/cancel",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "subscription",
+						  "cancel"
+						]
+					  },
+					  "description": "Cancel gym's subscription"
+					}
+				  }
+				],
+				"description": "Gym subscription management"
+			  },
+			  {
+				"name": "Gym Subscription Plans",
+				"item": [
+				  {
+					"name": "List Gym Subscription Plans",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "GET",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/subscription-plans?active=true",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "subscription-plans"
+						],
+						"query": [
+						  {
+							"key": "active",
+							"value": "true",
+							"description": "Filter by active status"
+						  }
+						]
+					  },
+					  "description": "Get list of gym's subscription plans for clients"
+					}
+				  },
+				  {
+					"name": "Get Public Gym Plans",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "GET",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/public-subscription-plans",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "public-subscription-plans"
+						]
+					  },
+					  "description": "Get list of publicly available gym subscription plans for clients"
+					}
+				  },
+				  {
+					"name": "Create Gym Subscription Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "POST",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"name\": \"Basic Client Plan\",\n    \"description\": \"Basic subscription plan for gym clients\",\n    \"price\": 29.99,\n    \"billing_cycle\": \"monthly\",\n    \"features\": {\n        \"personal_training\": false,\n        \"diet_plans\": true,\n        \"unlimited_workouts\": false\n    },\n    \"is_active\": true\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/subscription-plans",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "subscription-plans"
+						]
+					  },
+					  "description": "Create a new gym subscription plan for clients"
+					}
+				  },
+				  {
+					"name": "Get Gym Subscription Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "GET",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/subscription-plans/1",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "subscription-plans",
+						  "1"
+						]
+					  },
+					  "description": "Get gym subscription plan details"
+					}
+				  },
+				  {
+					"name": "Update Gym Subscription Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "PUT",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"name\": \"Updated Basic Client Plan\",\n    \"price\": 34.99,\n    \"features\": {\n        \"personal_training\": true,\n        \"diet_plans\": true,\n        \"unlimited_workouts\": false\n    }\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/subscription-plans/1",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "subscription-plans",
+						  "1"
+						]
+					  },
+					  "description": "Update gym subscription plan details"
+					}
+				  },
+				  {
+					"name": "Delete Gym Subscription Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "DELETE",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/gyms/1/subscription-plans/1",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "gyms",
+						  "1",
+						  "subscription-plans",
+						  "1"
+						]
+					  },
+					  "description": "Delete gym subscription plan"
+					}
+				  }
+				],
+				"description": "Gym subscription plan management for clients"
+			  },
+			  {
+				"name": "Client Subscriptions",
+				"item": [
+				  {
+					"name": "List Client Subscriptions",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "GET",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/client-subscriptions?gym_id=1&status=active",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "client-subscriptions"
+						],
+						"query": [
+						  {
+							"key": "gym_id",
+							"value": "1",
+							"description": "Filter by gym ID"
+						  },
+						  {
+							"key": "status",
+							"value": "active",
+							"description": "Filter by status"
+						  }
+						]
+					  },
+					  "description": "Get list of client subscriptions"
+					}
+				  },
+				  {
+					"name": "Create Client Subscription",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "POST",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"user_id\": 3,\n    \"gym_id\": 1,\n    \"gym_subscription_plan_id\": 1,\n    \"status\": \"active\",\n    \"start_date\": \"2025-03-01\",\n    \"auto_renew\": true,\n    \"payment_status\": \"paid\"\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/client-subscriptions",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "client-subscriptions"
+						]
+					  },
+					  "description": "Create a new client subscription"
+					}
+				  },
+				  {
+					"name": "Get Client Subscription",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "GET",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/client-subscriptions/1",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "client-subscriptions",
+						  "1"
+						]
+					  },
+					  "description": "Get client subscription details"
+					}
+				  },
+				  {
+					"name": "Update Client Subscription",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "PUT",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"status\": \"active\",\n    \"end_date\": \"2025-06-01\",\n    \"auto_renew\": false,\n    \"payment_status\": \"paid\"\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/client-subscriptions/1",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "client-subscriptions",
+						  "1"
+						]
+					  },
+					  "description": "Update client subscription details"
+					}
+				  },
+				  {
+					"name": "Delete Client Subscription",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "DELETE",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "url": {
+						"raw": "{{base_url}}/api/client-subscriptions/1",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "client-subscriptions",
+						  "1"
+						]
+					  },
+					  "description": "Delete client subscription"
+					}
+				  },
+				  {
+					"name": "Subscribe User to Gym Plan",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "POST",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{\n    \"gym_id\": 1,\n    \"gym_subscription_plan_id\": 1,\n    \"auto_renew\": true,\n    \"payment_status\": \"paid\"\n}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/users/3/subscribe",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "users",
+						  "3",
+						  "subscribe"
+						]
+					  },
+					  "description": "Subscribe a user to a gym subscription plan"
+					}
+				  }
+				],
+				"description": "Client subscription management"
+			  },
+			  {
+				"name": "AI Meal Generation",
+				"item": [
+				  {
+					"name": "Generate Meals with AI",
+					"request": {
+					  "auth": {
+						"type": "bearer",
+						"bearer": [
+						  {
+							"key": "token",
+							"value": "{{auth_token}}",
+							"type": "string"
+						  }
+						]
+					  },
+					  "method": "POST",
+					  "header": [
+						{
+						  "key": "Accept",
+						  "value": "application/json",
+						  "type": "text"
+						},
+						{
+						  "key": "Content-Type",
+						  "value": "application/json",
+						  "type": "text"
+						}
+					  ],
+					  "body": {
+						"mode": "raw",
+						"raw": "{}"
+					  },
+					  "url": {
+						"raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/generate-ai",
+						"host": [
+						  "{{base_url}}"
+						],
+						"path": [
+						  "api",
+						  "diet-plans",
+						  "1",
+						  "meal-plans",
+						  "1",
+						  "generate-ai"
+						]
+					  },
+					  "description": "Generate meals for a meal plan using AI (subscription required)"
+					}
+				  }
+				],
+				"description": "AI-based meal generation with subscription feature checks"
+			  }
+			],
+			"description": "Subscription management and feature access"
+		  }
 	]
 }

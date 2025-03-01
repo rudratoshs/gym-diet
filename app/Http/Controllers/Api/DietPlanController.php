@@ -9,14 +9,29 @@ use App\Http\Resources\MealPlanResource;
 use App\Models\DietPlan;
 use App\Models\User;
 use App\Models\AssessmentSession;
+use App\Services\SubscriptionFeatureService;
 use App\Services\AIService;
 use App\Services\AIServiceFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Validator;
 
 class DietPlanController extends Controller
 {
+    protected $subscriptionFeatureService;
+
+    /**
+     * Create a new controller instance.
+     *
+     * @param  \App\Services\SubscriptionFeatureService  $subscriptionFeatureService
+     * @return void
+     */
+    public function __construct(SubscriptionFeatureService $subscriptionFeatureService = null)
+    {
+        $this->subscriptionFeatureService = $subscriptionFeatureService ?? app(SubscriptionFeatureService::class);
+    }
+
     /**
      * Display a listing of the diet plans.
      */
@@ -94,10 +109,29 @@ class DietPlanController extends Controller
 
         // Ensure client exists and is a client
         $client = User::findOrFail($validated['client_id']);
+        $gym = $client->gyms()->first();
 
         // Check if user can create diet plan for this client
         if (!$this->canManageClient($request->user(), $client)) {
             return response()->json(['message' => 'You are not authorized to create a diet plan for this client'], 403);
+        }
+
+        // Check if the client has an active subscription to the gym
+        if (!$client->hasActiveSubscriptionToGym($gym->id)) {
+            return response()->json(['error' => 'Client does not have an active subscription'], 403);
+        }
+
+        // Check if gym can create diet plans (feature access)
+        if (!$this->subscriptionFeatureService->hasAccess($gym->id, 'max_diet_plans')) {
+            return response()->json(['error' => 'Diet plan creation is not available in current subscription'], 403);
+        }
+
+        // Count existing diet plans for the client
+        $existingPlanCount = DietPlan::where('client_id', $client->id)->count();
+
+        // Check if limit reached
+        if (!$this->subscriptionFeatureService->hasFeatureAndAvailableUsage($gym->id, 'max_diet_plans', $existingPlanCount + 1)) {
+            return response()->json(['error' => 'Maximum number of diet plans per client reached for this subscription'], 403);
         }
 
         // Check if this client should use AI or manual dietitian
@@ -148,6 +182,9 @@ class DietPlanController extends Controller
                 $dietPlan->end_date = $validated['end_date'] ?? now()->addMonths(3);
                 $dietPlan->save();
 
+                // Increment feature usage
+                $this->subscriptionFeatureService->incrementUsage($gym->id, 'max_diet_plans');
+
                 return new DietPlanResource($dietPlan->load(['client', 'creator']));
             } catch (\Exception $e) {
                 return response()->json([
@@ -162,6 +199,8 @@ class DietPlanController extends Controller
             $dietPlan->status = $validated['status'] ?? 'active';
             $dietPlan->save();
 
+            // Increment feature usage
+            $this->subscriptionFeatureService->incrementUsage($gym->id, 'max_diet_plans');
             return new DietPlanResource($dietPlan->load(['client', 'creator']));
         }
     }
@@ -241,21 +280,49 @@ class DietPlanController extends Controller
 
     /**
      * Duplicate a diet plan.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\DietPlan  $dietPlan
+     * @return \Illuminate\Http\Response
      */
     public function duplicate(Request $request, DietPlan $dietPlan)
     {
-        // Check if user can view this diet plan (prerequisite for duplicating)
-        if (!$this->canViewDietPlan($request->user(), $dietPlan)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        $validator = Validator::make($request->all(), [
+            'new_title' => 'sometimes|string|max:255',
+            'client_id' => 'sometimes|exists:users,id',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // Load related meal plans and meals
-        $dietPlan->load('mealPlans.meals');
+        // Default to same client if not specified
+        $clientId = $request->client_id ?? $dietPlan->client_id;
 
-        // Create new diet plan
+        // Get client and their gym
+        $client = User::findOrFail($clientId);
+        $gym = $client->gyms()->first();
+
+        if (!$gym) {
+            return response()->json(['error' => 'Client not associated with any gym'], 400);
+        }
+
+        // Count existing diet plans for the client
+        $existingPlanCount = DietPlan::where('client_id', $clientId)->count();
+
+        // Check if limit reached
+        if (!$this->subscriptionFeatureService->hasFeatureAndAvailableUsage($gym->id, 'max_diet_plans', $existingPlanCount + 1)) {
+            return response()->json(['error' => 'Maximum number of diet plans per client reached for this subscription'], 403);
+        }
+
+        // Create new diet plan with duplicated data
         $newDietPlan = $dietPlan->replicate();
-        $newDietPlan->title = "Copy of " . $dietPlan->title;
-        $newDietPlan->created_by = $request->user()->id;
+        $newDietPlan->title = $request->new_title ?? $dietPlan->title . ' (Copy)';
+        $newDietPlan->client_id = $clientId;
+        $newDietPlan->start_date = $request->start_date;
+        $newDietPlan->end_date = $request->end_date;
         $newDietPlan->created_at = now();
         $newDietPlan->updated_at = now();
         $newDietPlan->save();
@@ -264,21 +331,21 @@ class DietPlanController extends Controller
         foreach ($dietPlan->mealPlans as $mealPlan) {
             $newMealPlan = $mealPlan->replicate();
             $newMealPlan->diet_plan_id = $newDietPlan->id;
-            $newMealPlan->created_at = now();
-            $newMealPlan->updated_at = now();
             $newMealPlan->save();
 
             foreach ($mealPlan->meals as $meal) {
                 $newMeal = $meal->replicate();
                 $newMeal->meal_plan_id = $newMealPlan->id;
-                $newMeal->created_at = now();
-                $newMeal->updated_at = now();
                 $newMeal->save();
             }
         }
 
+        // Increment feature usage
+        $this->subscriptionFeatureService->incrementUsage($gym->id, 'max_diet_plans');
+
         return new DietPlanResource($newDietPlan->load(['client', 'creator', 'mealPlans.meals']));
     }
+
 
     /**
      * Check if user can manage (create/edit diet plans for) a client.
