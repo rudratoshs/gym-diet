@@ -8,12 +8,14 @@ use App\Models\Gym;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Services\SubscriptionService;
+use App\Services\Payment\PaymentServiceFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class SubscriptionController extends Controller
 {
     protected $subscriptionService;
+    protected $paymentFactory;
 
     /**
      * Create a new controller instance.
@@ -21,9 +23,10 @@ class SubscriptionController extends Controller
      * @param  \App\Services\SubscriptionService  $subscriptionService
      * @return void
      */
-    public function __construct(SubscriptionService $subscriptionService)
+    public function __construct(SubscriptionService $subscriptionService,PaymentServiceFactory $paymentFactory)
     {
         $this->subscriptionService = $subscriptionService;
+        $this->paymentFactory = $paymentFactory;
     }
 
     /**
@@ -132,16 +135,19 @@ class SubscriptionController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        // Validate request inputs
         $validator = Validator::make($request->all(), [
             'plan_id' => 'sometimes|exists:subscription_plans,id',
+            'payment_provider' => 'sometimes|in:stripe,razorpay',
             'payment_method_id' => 'sometimes|string',
+            'plan_option' => 'sometimes|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // Get active subscription
+        // Fetch the active subscription
         $subscription = $this->subscriptionService->getActiveSubscription($gym->id);
 
         if (!$subscription) {
@@ -149,20 +155,42 @@ class SubscriptionController extends Controller
         }
 
         try {
-            // Change plan if requested
+            DB::beginTransaction();
+
+            // Change subscription plan if requested
             if ($request->has('plan_id')) {
                 $newPlan = SubscriptionPlan::findOrFail($request->plan_id);
-                $subscription = $this->subscriptionService->changePlan($subscription, $newPlan);
+
+                // Verify if the new plan option exists
+                $providerPlans = $newPlan->payment_provider_plans;
+                if (!isset($providerPlans[$request->plan_option])) {
+                    return response()->json(['error' => 'Invalid plan option'], 422);
+                }
+
+                // Get the provider plan ID
+                $providerPlanId = $providerPlans[$request->plan_option]['id'];
+                $billingCycle = $this->mapPlanOptionToBillingCycle($request->plan_option);
+
+                // Call subscription service to change the plan
+                $subscription = $this->subscriptionService->changePlan(
+                    $subscription,
+                    $newPlan,
+                    $billingCycle,
+                    $providerPlanId
+                );
             }
 
             // Update payment method if requested
             if ($request->has('payment_method_id')) {
-                $paymentService = $this->subscriptionService->getPaymentService($subscription->payment_provider);
+                $paymentService = $this->paymentFactory->create($request->payment_provider);
                 $paymentService->updatePaymentMethod($subscription, $request->payment_method_id);
             }
 
+            DB::commit();
             return new SubscriptionResource($subscription->fresh());
+
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
