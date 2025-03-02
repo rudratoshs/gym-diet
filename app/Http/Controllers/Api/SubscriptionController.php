@@ -34,6 +34,11 @@ class SubscriptionController extends Controller
      */
     public function show(Gym $gym)
     {
+        // Check permissions
+        if (!auth()->user()->can('view', $gym)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $subscription = $this->subscriptionService->getActiveSubscription($gym->id);
 
         if (!$subscription) {
@@ -52,11 +57,15 @@ class SubscriptionController extends Controller
      */
     public function subscribe(Request $request, Gym $gym)
     {
+        // Check permissions
+        if (!auth()->user()->can('update', $gym)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'plan_id' => 'required|exists:subscription_plans,id',
-            'billing_cycle' => 'required|in:monthly,quarterly,annual',
+            'plan_option' => 'required|string',
             'payment_provider' => 'required|in:stripe,razorpay',
-            'payment_method_id' => 'required_if:payment_provider,stripe',
             'payment_data' => 'sometimes|array',
         ]);
 
@@ -66,6 +75,12 @@ class SubscriptionController extends Controller
 
         // Get the plan
         $plan = SubscriptionPlan::findOrFail($request->plan_id);
+
+        // Verify the plan option exists
+        $providerPlans = $plan->payment_provider_plans;
+        if (!isset($providerPlans[$request->plan_option])) {
+            return response()->json(['error' => 'Invalid plan option'], 422);
+        }
 
         try {
             // Check if gym already has an active subscription
@@ -78,13 +93,23 @@ class SubscriptionController extends Controller
                 ], 409);
             }
 
+            // Get the provider plan ID
+            $providerPlanId = $providerPlans[$request->plan_option]['id'];
+
+            // Map the plan option to a billing cycle
+            $billingCycle = $this->mapPlanOptionToBillingCycle($request->plan_option);
+
+            // Set the provider plan ID in the payment data
+            $paymentData = $request->payment_data ?? [];
+            $paymentData['plan_id'] = $providerPlanId;
+
             // Create the subscription
             $subscription = $this->subscriptionService->subscribeToPlan(
                 $gym,
                 $plan,
-                $request->billing_cycle,
+                $billingCycle,
                 $request->payment_provider,
-                $request->only('payment_method_id', 'payment_data')
+                $paymentData
             );
 
             return new SubscriptionResource($subscription);
@@ -102,6 +127,11 @@ class SubscriptionController extends Controller
      */
     public function update(Request $request, Gym $gym)
     {
+        // Check permissions
+        if (!auth()->user()->can('update', $gym)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'plan_id' => 'sometimes|exists:subscription_plans,id',
             'payment_method_id' => 'sometimes|string',
@@ -127,7 +157,7 @@ class SubscriptionController extends Controller
 
             // Update payment method if requested
             if ($request->has('payment_method_id')) {
-                $paymentService = app('App\\Services\\Payment\\' . ucfirst($subscription->payment_provider) . 'SubscriptionService');
+                $paymentService = $this->subscriptionService->getPaymentService($subscription->payment_provider);
                 $paymentService->updatePaymentMethod($subscription, $request->payment_method_id);
             }
 
@@ -146,6 +176,11 @@ class SubscriptionController extends Controller
      */
     public function cancel(Request $request, Gym $gym)
     {
+        // Check permissions
+        if (!auth()->user()->can('update', $gym)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'at_period_end' => 'boolean',
         ]);
@@ -175,5 +210,29 @@ class SubscriptionController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Map plan option to billing cycle.
+     *
+     * @param  string  $planOption
+     * @return string
+     */
+    private function mapPlanOptionToBillingCycle(string $planOption)
+    {
+        if (str_starts_with($planOption, 'day_')) {
+            return 'daily';
+        } elseif (str_starts_with($planOption, 'week_')) {
+            return 'weekly';
+        } elseif (str_starts_with($planOption, 'month_')) {
+            $count = intval(substr($planOption, 6));
+            return $count == 1 ? 'monthly' : ($count == 3 ? 'quarterly' : 'monthly');
+        } elseif (str_starts_with($planOption, 'year_')) {
+            return 'annual';
+        } elseif (str_starts_with($planOption, 'one_time_')) {
+            return 'one_time';
+        }
+
+        return 'monthly'; // Default
     }
 }

@@ -9,33 +9,19 @@ class SubscriptionPlan extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'code',
         'description',
-        'monthly_price',
-        'quarterly_price',
-        'annual_price',
-        'features',
+        'plan_type',
         'is_active',
+        'payment_provider',
+        'payment_provider_plans'
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
-        'features' => 'json',
         'is_active' => 'boolean',
-        'monthly_price' => 'decimal:2',
-        'quarterly_price' => 'decimal:2',
-        'annual_price' => 'decimal:2',
+        'payment_provider_plans' => 'json',
     ];
 
     /**
@@ -47,12 +33,91 @@ class SubscriptionPlan extends Model
     }
 
     /**
-     * Get the features associated with this plan.
+     * Get the features associated with this plan via the pivot table.
      */
     public function features()
     {
         return $this->belongsToMany(SubscriptionFeature::class, 'subscription_plan_features')
             ->withPivot('value', 'limit')
             ->withTimestamps();
+    }
+
+    /**
+     * Get the SubscriptionPlanFeature records for this plan.
+     */
+    public function planFeatures()
+    {
+        return $this->hasMany(SubscriptionPlanFeature::class, 'subscription_plan_id');
+    }
+
+    /**
+     * Check if the plan is recurring.
+     *
+     * @return bool
+     */
+    public function isRecurring()
+    {
+        return $this->plan_type === 'recurring';
+    }
+
+    /**
+     * Get the payment provider plan ID for a specific billing option.
+     *
+     * @param string $key The billing option key
+     * @return string|null
+     */
+    public function getPaymentProviderPlanId($key)
+    {
+        $plans = $this->payment_provider_plans;
+        return $plans[$key]['id'] ?? null;
+    }
+
+    /**
+     * Check if this plan has a specific feature.
+     *
+     * @param string $featureCode
+     * @return bool
+     */
+    public function hasFeature($featureCode)
+    {
+        return $this->features()->where('code', $featureCode)->exists();
+    }
+
+    /**
+     * Get a specific feature value.
+     *
+     * @param string $featureCode
+     * @return mixed|null
+     */
+    public function getFeatureValue($featureCode)
+    {
+        $feature = $this->features()->where('code', $featureCode)->first();
+        return $feature ? $feature->pivot->value : null;
+    }
+
+    /**
+     * Get a specific feature limit.
+     *
+     * @param string $featureCode
+     * @return int|null
+     */
+    public function getFeatureLimit($featureCode)
+    {
+        $feature = $this->features()->where('code', $featureCode)->first();
+        return $feature ? $feature->pivot->limit : null;
+    }
+
+    /**
+     * Get a specific SubscriptionPlanFeature by the associated feature code.
+     *
+     * @param string $featureCode
+     * @return \App\Models\SubscriptionPlanFeature|null
+     */
+    public function getPlanFeatureByCode($featureCode)
+    {
+        return $this->planFeatures()
+            ->whereHas('feature', function ($query) use ($featureCode) {
+                $query->where('code', $featureCode);
+            })->first();
     }
 }

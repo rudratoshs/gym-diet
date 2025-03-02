@@ -53,7 +53,29 @@ class SubscriptionService
             $paymentService = $this->paymentFactory->create($paymentProvider);
 
             // Create subscription through payment provider
-            $subscription = $paymentService->createSubscription($gym, $plan, $billingCycle, $paymentData);
+            $subscriptionData = [
+                'plan_id' => $paymentData['plan_id'], // Ensure this exists in paymentData
+                'metadata' => [
+                    'gym_id' => $gym->id,
+                    'gym_name' => $gym->name,
+                ],
+                'start_date' => now()->timestamp // Optional: Can be removed if not needed
+            ];
+
+            // Create subscription through payment provider (passing subscriptionData)
+            $subscriptionResponse = $paymentService->createSubscription($subscriptionData);
+
+            // Store subscription in the database
+            $subscription = Subscription::create([
+                'gym_id' => $gym->id,
+                'subscription_plan_id' => $plan->id,
+                'status' => $subscriptionResponse->status ?? 'active', // Default to active if not provided
+                'current_period_start' => $subscriptionResponse->current_period_start ?? now(),
+                'current_period_end' => $subscriptionResponse->current_period_end ?? now()->addMonth(), // Default to 1 month if missing
+                'payment_provider' => $paymentProvider,
+                'payment_provider_id' => $subscriptionResponse->id ?? null, // Ensure this field exists
+                'billing_cycle' => $billingCycle,
+            ]);
 
             // Set up feature usage tracking
             $this->featureService->setupFeaturesForGym($gym->id, $plan);
@@ -64,7 +86,7 @@ class SubscriptionService
             $gym->save();
 
             DB::commit();
-            return $subscription;
+            return $subscription; // Now returning an Eloquent model
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -95,16 +117,16 @@ class SubscriptionService
 
             if ($result) {
                 $subscription->canceled_at = now();
-                
+
                 if (!$atPeriodEnd) {
                     $subscription->status = 'canceled';
-                    
+
                     // Update gym subscription status
                     $gym = $subscription->gym;
                     $gym->subscription_status = 'inactive';
                     $gym->save();
                 }
-                
+
                 $subscription->save();
             }
 
@@ -162,22 +184,72 @@ class SubscriptionService
      * @param  array  $data
      * @return \App\Models\GymSubscriptionPlan
      */
-    public function createGymPlan(Gym $gym, array $data)
+    public function createInternalGymPlan(Gym $gym, array $data)
     {
-        // Check if gym has an active subscription
+        // Check if the gym has an active subscription
         if (!$this->hasActiveSubscription($gym->id)) {
-            throw new \Exception('Gym does not have an active subscription to create client plans');
+            throw new \Exception('Gym does not have an active subscription to create client plans.');
         }
 
-        return GymSubscriptionPlan::create([
-            'gym_id' => $gym->id,
-            'name' => $data['name'],
-            'description' => $data['description'] ?? null,
-            'price' => $data['price'],
-            'billing_cycle' => $data['billing_cycle'],
-            'features' => $data['features'] ?? null,
-            'is_active' => $data['is_active'] ?? true,
-        ]);
+        try {
+            // Begin database transaction
+            DB::beginTransaction();
+
+            // Validate required parameters
+            if (empty($data['name']) || empty($data['price'])) {
+                throw new \Exception('Missing required fields: name, price.');
+            }
+
+            $paymentProvider = $data['payment_provider'];
+            $billingCycle = $data['billing_cycle'];
+            // Get the payment service instance
+            $paymentService = $this->paymentFactory->create($paymentProvider);
+
+            if (!$paymentService) {
+                throw new \Exception("Payment provider [$paymentProvider] is not supported.");
+            }
+
+            // Prepare minimal plan details
+            $plan = new SubscriptionPlan([
+                'name' => $data['name'],
+                'price' => $data['price']
+            ]);
+
+            // Create Plan in the Payment Provider (e.g., Razorpay)
+            $paymentProviderPlanId = $paymentService->createPlan($plan, $billingCycle);
+
+            if (!$paymentProviderPlanId) {
+                throw new \Exception("Failed to create plan with $paymentProvider.");
+            }
+
+            // Store in the database
+            $gymPlan = GymSubscriptionPlan::create([
+                'gym_id' => $gym->id,
+                'name' => $data['name'],
+                'price' => $data['price'],
+                'billing_cycle' => $billingCycle,
+                'is_active' => $data['is_active'] ?? true,
+                'payment_provider_plan_id' => $paymentProviderPlanId,
+            ]);
+
+            // Commit the transaction
+            DB::commit();
+
+            return $gymPlan;
+
+        } catch (\Exception $e) {
+            // Rollback in case of error
+            DB::rollBack();
+
+            Log::error('Failed to create gym subscription plan: ' . $e->getMessage(), [
+                'gym_id' => $gym->id,
+                'billing_cycle' => $billingCycle,
+                'payment_provider' => $paymentProvider,
+                'exception' => $e,
+            ]);
+
+            throw $e;
+        }
     }
 
     /**

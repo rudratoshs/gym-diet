@@ -9,15 +9,20 @@ use App\Models\SubscriptionPlan;
 interface PaymentServiceInterface
 {
     /**
-     * Create a subscription for a gym.
+     * Create a plan in the payment provider.
      *
-     * @param  \App\Models\Gym  $gym
-     * @param  \App\Models\SubscriptionPlan  $plan
-     * @param  string  $billingCycle
-     * @param  array  $paymentData
-     * @return \App\Models\Subscription
+     * @param  array  $planData
+     * @return string  The plan ID in the payment provider
      */
-    public function createSubscription(Gym $gym, SubscriptionPlan $plan, string $billingCycle, array $paymentData);
+    public function createPlanInProvider(array $planData);
+
+    /**
+     * Create a subscription in the payment provider.
+     *
+     * @param  array  $subscriptionData
+     * @return object  The subscription object from the payment provider
+     */
+    public function createSubscription(array $subscriptionData);
 
     /**
      * Cancel a subscription.

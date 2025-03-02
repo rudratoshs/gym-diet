@@ -63,6 +63,7 @@ class GymSubscriptionPlanController extends Controller
             'billing_cycle' => 'required|in:monthly,quarterly,annual',
             'features' => 'nullable|array',
             'is_active' => 'boolean',
+            'payment_provider' => 'required|in:stripe,razorpay',
         ]);
 
         if ($validator->fails()) {
@@ -70,7 +71,7 @@ class GymSubscriptionPlanController extends Controller
         }
 
         try {
-            $plan = $this->subscriptionService->createGymPlan($gym, $validator->validated());
+            $plan = $this->subscriptionService->createInternalGymPlan($gym, $validator->validated());
             return new GymSubscriptionPlanResource($plan);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);

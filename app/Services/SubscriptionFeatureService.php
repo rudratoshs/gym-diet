@@ -187,18 +187,27 @@ class SubscriptionFeatureService
             // Begin database transaction
             DB::beginTransaction();
 
-            // Get all features for the plan with their limits
-            $planFeatures = $plan->features;
+            // Decode features JSON to an array
+            $planFeatures = is_string($plan->features) ? json_decode($plan->features, true) : $plan->features;
 
-            foreach ($planFeatures as $feature) {
-                // Get limit from pivot table
-                $limit = $feature->pivot->limit;
+            // Ensure it's an array before proceeding
+            if (!is_array($planFeatures)) {
+                throw new \Exception('Invalid features data format.');
+            }
+
+            foreach ($planFeatures as $featureCode => $limit) {
+                // Fetch feature ID using the feature code
+                $feature = SubscriptionFeature::where('code', $featureCode)->first();
+
+                if (!$feature) {
+                    throw new \Exception("Feature with code '{$featureCode}' not found.");
+                }
 
                 // Create or update feature usage record
                 SubscriptionFeatureUsage::updateOrCreate(
                     [
                         'gym_id' => $gymId,
-                        'subscription_feature_id' => $feature->id,
+                        'subscription_feature_id' => $feature->id, // Use feature ID instead of string code
                     ],
                     [
                         'current_usage' => 0,

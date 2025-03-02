@@ -22,92 +22,98 @@ class StripeSubscriptionService implements PaymentServiceInterface
      */
     public function __construct()
     {
-        if (!class_exists('Stripe\StripeClient')) {
-            Log::warning('Stripe PHP SDK is not installed. Run: composer require stripe/stripe-php');
-        } else {
-            $this->stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
+        $this->stripe = new StripeClient(config('services.stripe.secret'));
+    }
+
+    /**
+     * Create a plan in Stripe.
+     *
+     * @param  array  $planData
+     * @return string  The plan ID in Stripe
+     */
+    public function createPlanInProvider(array $planData)
+    {
+        try {
+            // First create a product
+            $product = $this->stripe->products->create([
+                'name' => $planData['name'],
+                'description' => $planData['description'] ?? null,
+            ]);
+
+            // Create price data
+            $priceData = [
+                'product' => $product->id,
+                'unit_amount' => (int) $planData['amount'],
+                'currency' => $planData['currency'] ?? 'inr',
+            ];
+
+            // Add recurring info if it's a recurring plan
+            if (!empty($planData['is_recurring'])) {
+                $priceData['recurring'] = [
+                    'interval' => $planData['interval'] ?? 'month',
+                    'interval_count' => $planData['interval_count'] ?? 1,
+                ];
+            }
+
+            // Then create a price for the product
+            $price = $this->stripe->prices->create($priceData);
+
+            return $price->id;
+
+        } catch (ApiErrorException $e) {
+            Log::error('Stripe error: ' . $e->getMessage(), [
+                'error' => $e->getJsonBody(),
+            ]);
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Failed to create Stripe plan: ' . $e->getMessage());
+            throw $e;
         }
     }
 
-
     /**
-     * Create a subscription for a gym.
+     * Create a subscription in Stripe.
      *
-     * @param  \App\Models\Gym  $gym
-     * @param  \App\Models\SubscriptionPlan  $plan
-     * @param  string  $billingCycle
-     * @param  array  $paymentData
-     * @return \App\Models\Subscription
-     * 
-     * @throws \Exception
+     * @param  array  $subscriptionData
+     * @return object  The subscription object from Stripe
      */
-    public function createSubscription(Gym $gym, SubscriptionPlan $plan, string $billingCycle, array $paymentData)
+    public function createSubscription(array $subscriptionData)
     {
         try {
-            // Get price ID based on plan type and billing cycle
-            $priceId = $this->getPriceId($plan, $billingCycle);
-
-            // Get gym owner
-            $owner = $gym->owner;
-
-            // Get or create customer
-            $customer = $this->getOrCreateCustomer($owner);
-
-            // Attach payment method to customer
-            if (isset($paymentData['payment_method_id'])) {
-                $this->stripe->paymentMethods->attach(
-                    $paymentData['payment_method_id'],
-                    ['customer' => $customer->id]
-                );
-
-                // Set as default payment method
-                $this->stripe->customers->update($customer->id, [
+            // If no customer ID is provided, we need a payment method ID
+            if (empty($subscriptionData['customer_id']) && !empty($subscriptionData['payment_method_id'])) {
+                // Create customer and attach payment method
+                $customer = $this->stripe->customers->create([
+                    'payment_method' => $subscriptionData['payment_method_id'],
                     'invoice_settings' => [
-                        'default_payment_method' => $paymentData['payment_method_id'],
+                        'default_payment_method' => $subscriptionData['payment_method_id'],
                     ],
+                    'metadata' => $subscriptionData['metadata'] ?? [],
                 ]);
+
+                $customerId = $customer->id;
+            } else {
+                $customerId = $subscriptionData['customer_id'];
             }
 
             // Create subscription
-            $stripeSubscription = $this->stripe->subscriptions->create([
-                'customer' => $customer->id,
+            $subscription = $this->stripe->subscriptions->create([
+                'customer' => $customerId,
                 'items' => [
-                    ['price' => $priceId],
+                    ['price' => $subscriptionData['plan_id']],
                 ],
-                'metadata' => [
-                    'gym_id' => $gym->id,
-                    'plan_id' => $plan->id,
-                    'billing_cycle' => $billingCycle,
-                ],
+                'metadata' => $subscriptionData['metadata'] ?? [],
             ]);
-
-            // Create subscription record
-            $subscription = new Subscription();
-            $subscription->gym_id = $gym->id;
-            $subscription->subscription_plan_id = $plan->id;
-            $subscription->status = $stripeSubscription->status;
-            $subscription->current_period_start = Carbon::createFromTimestamp($stripeSubscription->current_period_start);
-            $subscription->current_period_end = Carbon::createFromTimestamp($stripeSubscription->current_period_end);
-            $subscription->payment_provider = 'stripe';
-            $subscription->payment_provider_id = $stripeSubscription->id;
-            $subscription->billing_cycle = $billingCycle;
-            $subscription->save();
 
             return $subscription;
 
         } catch (ApiErrorException $e) {
             Log::error('Stripe error: ' . $e->getMessage(), [
-                'gym_id' => $gym->id,
-                'plan_id' => $plan->id,
                 'error' => $e->getJsonBody(),
             ]);
             throw $e;
         } catch (\Exception $e) {
-            Log::error('Failed to create Stripe subscription: ' . $e->getMessage(), [
-                'gym_id' => $gym->id,
-                'plan_id' => $plan->id,
-                'exception' => $e,
-            ]);
+            Log::error('Failed to create Stripe subscription: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -118,8 +124,6 @@ class StripeSubscriptionService implements PaymentServiceInterface
      * @param  \App\Models\Subscription  $subscription
      * @param  bool  $atPeriodEnd
      * @return bool
-     * 
-     * @throws \Exception
      */
     public function cancelSubscription(Subscription $subscription, bool $atPeriodEnd = true)
     {
@@ -157,14 +161,32 @@ class StripeSubscriptionService implements PaymentServiceInterface
      * @param  \App\Models\Subscription  $subscription
      * @param  \App\Models\SubscriptionPlan  $newPlan
      * @return \App\Models\Subscription
-     * 
-     * @throws \Exception
      */
     public function changePlan(Subscription $subscription, SubscriptionPlan $newPlan)
     {
         try {
-            // Get price ID for the new plan
-            $priceId = $this->getPriceId($newPlan, $subscription->billing_cycle);
+            // Get the appropriate plan ID for the current billing cycle
+            $planOption = $subscription->billing_cycle;
+            $planIdKey = '';
+
+            switch ($subscription->billing_cycle) {
+                case 'monthly':
+                    $planIdKey = 'month_1';
+                    break;
+                case 'quarterly':
+                    $planIdKey = 'month_3';
+                    break;
+                case 'annual':
+                    $planIdKey = 'year_1';
+                    break;
+            }
+
+            $providerPlans = $newPlan->payment_provider_plans;
+            if (!isset($providerPlans[$planIdKey])) {
+                throw new \Exception("Plan option not available: {$planIdKey}");
+            }
+
+            $providerPlanId = $providerPlans[$planIdKey]['id'];
 
             // Get subscription from Stripe
             $stripeSubscription = $this->stripe->subscriptions->retrieve($subscription->payment_provider_id);
@@ -174,7 +196,7 @@ class StripeSubscriptionService implements PaymentServiceInterface
                 'items' => [
                     [
                         'id' => $stripeSubscription->items->data[0]->id,
-                        'price' => $priceId,
+                        'price' => $providerPlanId,
                     ],
                 ],
                 'metadata' => [
@@ -212,23 +234,22 @@ class StripeSubscriptionService implements PaymentServiceInterface
      * @param  \App\Models\Subscription  $subscription
      * @param  string  $paymentMethodId
      * @return bool
-     * 
-     * @throws \Exception
      */
     public function updatePaymentMethod(Subscription $subscription, string $paymentMethodId)
     {
         try {
-            $gym = $subscription->gym;
-            $owner = $gym->owner;
+            // Get subscription details to find customer
+            $stripeSubscription = $this->stripe->subscriptions->retrieve($subscription->payment_provider_id);
+            $customerId = $stripeSubscription->customer;
 
             // Attach payment method to customer
             $this->stripe->paymentMethods->attach(
                 $paymentMethodId,
-                ['customer' => $owner->stripe_customer_id]
+                ['customer' => $customerId]
             );
 
             // Set as default payment method
-            $this->stripe->customers->update($owner->stripe_customer_id, [
+            $this->stripe->customers->update($customerId, [
                 'invoice_settings' => [
                     'default_payment_method' => $paymentMethodId,
                 ],
@@ -269,68 +290,5 @@ class StripeSubscriptionService implements PaymentServiceInterface
             Log::error('Webhook signature verification failed: ' . $e->getMessage());
             return false;
         }
-    }
-
-    /**
-     * Get or create customer on Stripe.
-     *
-     * @param  \App\Models\User  $user
-     * @return \Stripe\Customer
-     */
-    protected function getOrCreateCustomer(User $user)
-    {
-        if ($user->stripe_customer_id) {
-            return $this->stripe->customers->retrieve($user->stripe_customer_id);
-        }
-
-        $customer = $this->stripe->customers->create([
-            'email' => $user->email,
-            'name' => $user->name,
-            'phone' => $user->phone,
-            'metadata' => [
-                'user_id' => $user->id
-            ]
-        ]);
-
-        $user->stripe_customer_id = $customer->id;
-        $user->save();
-
-        return $customer;
-    }
-
-    /**
-     * Get Stripe price ID for a plan and billing cycle.
-     *
-     * @param  \App\Models\SubscriptionPlan  $plan
-     * @param  string  $billingCycle
-     * @return string
-     * 
-     * @throws \Exception
-     */
-    protected function getPriceId(SubscriptionPlan $plan, string $billingCycle)
-    {
-        $priceMap = [
-            'starter' => [
-                'monthly' => config('services.stripe.prices.starter.monthly'),
-                'quarterly' => config('services.stripe.prices.starter.quarterly'),
-                'annual' => config('services.stripe.prices.starter.annual'),
-            ],
-            'growth' => [
-                'monthly' => config('services.stripe.prices.growth.monthly'),
-                'quarterly' => config('services.stripe.prices.growth.quarterly'),
-                'annual' => config('services.stripe.prices.growth.annual'),
-            ],
-            'enterprise' => [
-                'monthly' => config('services.stripe.prices.enterprise.monthly'),
-                'quarterly' => config('services.stripe.prices.enterprise.quarterly'),
-                'annual' => config('services.stripe.prices.enterprise.annual'),
-            ],
-        ];
-
-        if (!isset($priceMap[$plan->code][$billingCycle])) {
-            throw new \Exception("No price ID configured for plan {$plan->code} with billing cycle {$billingCycle}");
-        }
-
-        return $priceMap[$plan->code][$billingCycle];
     }
 }

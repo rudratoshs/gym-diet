@@ -22,6 +22,7 @@ class GymSubscriptionPlan extends Model
         'billing_cycle',
         'features',
         'is_active',
+        'payment_provider_plan_id'
     ];
 
     /**

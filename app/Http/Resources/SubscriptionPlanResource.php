@@ -19,19 +19,21 @@ class SubscriptionPlanResource extends JsonResource
             'name' => $this->name,
             'code' => $this->code,
             'description' => $this->description,
-            'monthly_price' => $this->monthly_price,
-            'quarterly_price' => $this->quarterly_price,
-            'annual_price' => $this->annual_price,
-            'features' => $this->features,
+            'plan_type' => $this->plan_type,
             'is_active' => $this->is_active,
+            'payment_provider' => $this->payment_provider,
+            'payment_plans' => $this->when($request->user() && $request->user()->hasRole('admin'), 
+                $this->payment_provider_plans
+            ),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
-            'features_detail' => $this->when($request->user() && $request->user()->hasRole('admin'), function() {
-                return $this->features()->get()->map(function($feature) {
+            'features' => $this->when($this->relationLoaded('features'), function() {
+                return $this->features->map(function($feature) {
                     return [
                         'id' => $feature->id,
                         'name' => $feature->name,
                         'code' => $feature->code,
+                        'description' => $feature->description,
                         'type' => $feature->type,
                         'limit' => $feature->pivot->limit,
                         'value' => $feature->pivot->value,

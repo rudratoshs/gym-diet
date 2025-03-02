@@ -91,7 +91,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/gyms/{gym}/ai-configurations/{configuration}/test', [AIConfigurationController::class, 'test']);
 
     // Platform Subscription Plans routes (admin only)
-    Route::middleware('permission:manage_subscription_plans')->group(function () {
+    Route::middleware('role:admin')->group(function () {
         Route::get('/subscription-plans', [SubscriptionPlanController::class, 'index']);
         Route::post('/subscription-plans', [SubscriptionPlanController::class, 'store']);
         Route::get('/subscription-plans/{subscriptionPlan}', [SubscriptionPlanController::class, 'show']);
