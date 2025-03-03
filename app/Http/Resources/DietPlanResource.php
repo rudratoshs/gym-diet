@@ -1,6 +1,5 @@
 <?php
 
-// app/Http/Resources/DietPlanResource.php
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
@@ -13,9 +12,9 @@ class DietPlanResource extends JsonResource
         return [
             'id' => $this->id,
             'client_id' => $this->client_id,
-            'client' => new UserResource($this->whenLoaded('client')),
+            'client' => new UserResource($this->client),
             'created_by' => $this->created_by,
-            'creator' => new UserResource($this->whenLoaded('creator')),
+            'creator' => new UserResource($this->creator),
             'title' => $this->title,
             'description' => $this->description,
             'daily_calories' => $this->daily_calories,

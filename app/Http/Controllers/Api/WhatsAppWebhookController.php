@@ -23,6 +23,8 @@ class WhatsAppWebhookController extends Controller
      */
     public function verify(Request $request)
     {
+        // Log::info('WhatsApp webhook verify');
+
         $mode = $request->query('hub_mode');
         $token = $request->query('hub_verify_token');
         $challenge = $request->query('hub_challenge');
@@ -42,23 +44,29 @@ class WhatsAppWebhookController extends Controller
     public function handleWebhook(Request $request)
     {
         $payload = $request->all();
-        Log::info('WhatsApp webhook received', ['payload' => $payload]);
+        // Log::info('WhatsApp webhook received', ['payload' => $payload]);
 
-        // **1. Implement Rate Limiting**
+        // Rate Limiting
         $rateLimitKey = 'whatsapp_webhook:' . md5(json_encode($payload));
         if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
             return response()->json(['error' => 'Too many requests, please wait'], 429);
         }
-        RateLimiter::hit($rateLimitKey, 60); // Allow 5 requests per minute
+        RateLimiter::hit($rateLimitKey, 60);
 
-        // **2. Validate Payload**
+        // Check if this is a message status update, not a message
+        if (isset($payload['entry'][0]['changes'][0]['value']['statuses'])) {
+            // Log::info('Status update received, ignoring');
+            return response()->json(['message' => 'Status update received'], 200);
+        }
+
+        // Validate Payload
         if (!isset($payload['entry'][0]['changes'][0]['value']['messages'][0])) {
-            Log::error('Invalid WhatsApp webhook payload', ['payload' => $payload]);
-            return response()->json(['error' => 'Invalid webhook format'], 400);
+            // Log::info('No messages in payload, might be a different type of update');
+            return response()->json(['message' => 'No messages to process'], 200);
         }
 
         try {
-            // **3. Process Incoming Message**
+            // Process Incoming Message
             $this->whatsAppService->handleIncomingMessage($payload);
             return response()->json(['message' => 'Webhook processed successfully'], 200);
         } catch (\Exception $e) {
@@ -66,7 +74,23 @@ class WhatsAppWebhookController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            return response()->json(['error' => 'Webhook processing error'], 500);
+            // Always return 200 to WhatsApp, even if there's an error
+            return response()->json(['error' => 'Webhook processing error, but acknowledged'], 200);
         }
     }
+
+    public function sendMessage(Request $request)
+    {
+        $result = $this->whatsAppService->sendTextMessage(
+            $request->input('to'),
+            $request->input('message')
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => $result
+        ]);
+    }
+
+
 }

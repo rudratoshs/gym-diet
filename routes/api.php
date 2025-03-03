@@ -24,6 +24,7 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 // WhatsApp webhook routes (public)
 Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
 Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handleWebhook']);
+Route::post('/whatsapp/send', [WhatsAppWebhookController::class, 'sendMessage']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {

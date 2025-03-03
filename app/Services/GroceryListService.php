@@ -161,7 +161,14 @@ class GroceryListService
         }
 
         foreach ($recipes['ingredients'] as $ingredient) {
-            $parsed = $this->parseIngredient($ingredient);
+            // If the ingredient is an array, try extracting its name or converting to string
+            if (is_array($ingredient)) {
+                $ingredientString = $ingredient['name'] ?? implode(' ', $ingredient); // Fallback to concatenation
+            } else {
+                $ingredientString = $ingredient;
+            }
+
+            $parsed = $this->parseIngredient($ingredientString);
             if ($parsed) {
                 $ingredients[] = $parsed;
             }

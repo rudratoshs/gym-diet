@@ -41,7 +41,7 @@ class DietPlanController extends Controller
 
         if ($user->hasRole('admin')) {
             // Admins can see all diet plans
-            $dietPlans = DietPlan::with(['client', 'creator'])
+            $dietPlans = DietPlan::with(['client', 'creator']) // Ensure client and creator are loaded
                 ->when($request->has('client_id'), function ($query) use ($request) {
                     return $query->where('client_id', $request->client_id);
                 })
@@ -61,7 +61,7 @@ class DietPlanController extends Controller
                 })
                 ->pluck('id');
 
-            $dietPlans = DietPlan::with(['client', 'creator'])
+            $dietPlans = DietPlan::with(['client', 'creator']) // Ensure relationships are loaded
                 ->whereIn('client_id', $clientIds)
                 ->when($request->has('client_id'), function ($query) use ($request) {
                     return $query->where('client_id', $request->client_id);
@@ -72,7 +72,7 @@ class DietPlanController extends Controller
                 ->paginate(10);
         } else {
             // Clients can only see their own diet plans
-            $dietPlans = DietPlan::with(['creator'])
+            $dietPlans = DietPlan::with(['client', 'creator']) // Ensure relationships are loaded
                 ->where('client_id', $user->id)
                 ->when($request->has('status'), function ($query) use ($request) {
                     return $query->where('status', $request->status);

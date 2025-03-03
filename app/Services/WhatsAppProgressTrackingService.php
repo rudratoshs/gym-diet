@@ -1,5 +1,4 @@
 <?php
-// app/Services/WhatsAppProgressTrackingService.php
 namespace App\Services;
 
 use App\Models\DailyProgress;
@@ -15,13 +14,10 @@ use Illuminate\Support\Str;
 
 class WhatsAppProgressTrackingService
 {
-    protected $whatsAppService;
-
-    public function __construct(WhatsAppService $whatsAppService)
+    public function getWhatsAppService()
     {
-        $this->whatsAppService = $whatsAppService;
+        return app(WhatsAppService::class);
     }
-
     /**
      * Process a progress tracking command
      * 
@@ -271,7 +267,7 @@ class WhatsAppProgressTrackingService
 
         if ($existingEntry) {
             // Update existing daily progress
-            $this->whatsAppService->sendTextMessage(
+            $this->getWhatsAppService()->sendTextMessage(
                 $user->whatsapp_phone,
                 "You've already started a check-in today. Let's continue tracking your progress."
             );
@@ -308,7 +304,7 @@ class WhatsAppProgressTrackingService
             $dailyProgress->save();
 
             // Start interactive check-in process
-            $this->whatsAppService->sendTextMessage(
+            $this->getWhatsAppService()->sendTextMessage(
                 $user->whatsapp_phone,
                 "📝 *Daily Check-in: " . Carbon::today()->format('D, M j') . "* 📝\n\n" .
                 "Let's track your progress for today! I'll ask a few quick questions."
@@ -318,7 +314,7 @@ class WhatsAppProgressTrackingService
         // Begin interactive water tracking
         $this->startWaterTracking($user);
 
-        return null; // No immediate response since we're starting an interactive flow
+        return ''; // No immediate response since we're starting an interactive flow
     }
 
     /**
@@ -326,7 +322,7 @@ class WhatsAppProgressTrackingService
      */
     protected function startWaterTracking(User $user): void
     {
-        $this->whatsAppService->sendTextMessage(
+        $this->getWhatsAppService()->sendTextMessage(
             $user->whatsapp_phone,
             "💧 *Water Intake*\n\n" .
             "How much water have you had today? (in glasses or ml)",
@@ -416,7 +412,7 @@ class WhatsAppProgressTrackingService
 
         $totalMeals = $dailyProgress->total_meals;
 
-        $this->whatsAppService->sendTextMessage(
+        $this->getWhatsAppService()->sendTextMessage(
             $user->whatsapp_phone,
             "🍽️ *Meal Plan Compliance*\n\n" .
             "How many of your planned meals have you completed today? (out of {$totalMeals})",
@@ -460,7 +456,7 @@ class WhatsAppProgressTrackingService
             $mealsCompleted = 0;
         } elseif ($mealInfo === 'meals_some') {
             // Will ask for specific number in next message
-            $this->whatsAppService->sendTextMessage(
+            $this->getWhatsAppService()->sendTextMessage(
                 $user->whatsapp_phone,
                 "How many meals have you completed so far? (1-{$totalMeals})"
             );
@@ -489,7 +485,7 @@ class WhatsAppProgressTrackingService
      */
     protected function startExerciseTracking(User $user): void
     {
-        $this->whatsAppService->sendTextMessage(
+        $this->getWhatsAppService()->sendTextMessage(
             $user->whatsapp_phone,
             "💪 *Exercise*\n\n" .
             "Have you completed your exercise today?",
@@ -555,7 +551,7 @@ class WhatsAppProgressTrackingService
      */
     protected function startMoodTracking(User $user): void
     {
-        $this->whatsAppService->sendTextMessage(
+        $this->getWhatsAppService()->sendTextMessage(
             $user->whatsapp_phone,
             "😊 *Energy & Mood*\n\n" .
             "How are you feeling today?",
@@ -1157,7 +1153,7 @@ class WhatsAppProgressTrackingService
         $message .= "Scheduled for: " . Carbon::parse($event->start_time)->format('g:i A') . "\n\n";
         $message .= "Remember to log your meal completion with 'meal done' later!";
 
-        return $this->whatsAppService->sendTextMessage($user->whatsapp_phone, $message);
+        return $this->getWhatsAppService()->sendTextMessage($user->whatsapp_phone, $message);
     }
 
     /**
@@ -1264,6 +1260,6 @@ class WhatsAppProgressTrackingService
 
         $message .= "\nType 'progress' anytime to see your current stats, or 'checkin' to log today's progress.";
 
-        return $this->whatsAppService->sendTextMessage($user->whatsapp_phone, $message);
+        return $this->getWhatsAppService()->sendTextMessage($user->whatsapp_phone, $message);
     }
 }
