@@ -48,16 +48,16 @@ class WhatsAppService
     /**
      * Load assessment flow from configuration
      */
-    private function loadAssessmentFlow()
+    private function loadAssessmentFlow($level = 'moderate')
     {
-        // Load from the configuration class
-        $this->assessmentFlow = [
-            'phases' => \App\Config\DietAssessmentFlow::getPhases(),
-            'questions' => \App\Config\DietAssessmentFlow::getQuestions()
-        ];
+        // Get user language preference (from database or session)
+        $userLang = 'en'; // Default to English
 
-        // Load conditional checks
-        $this->conditionalChecks = \App\Config\DietAssessmentFlow::getConditionalChecks();
+        // Load questions based on level and language
+        $this->assessmentFlow = [
+            'phases' => \App\Config\DietAssessmentFlow::getPhases($userLang),
+            'questions' => \App\Config\DietAssessmentFlow::getQuestions($level, $userLang)
+        ];
     }
 
     /**
@@ -171,30 +171,116 @@ class WhatsAppService
             ->where('status', 'in_progress')
             ->first();
 
+        LOG::info('iaehrhererererererererererererererer');
         if ($existingSession) {
             $this->sendTextMessage($user->whatsapp_phone, "You already have an assessment in progress. Would you like to continue or start over?", [
-                'type' => 'button',
-                'buttons' => [
-                    ['type' => 'reply', 'reply' => ['id' => 'continue', 'title' => 'Continue']],
-                    ['type' => 'reply', 'reply' => ['id' => 'restart', 'title' => 'Start Over']]
+                'type' => 'interactive',
+                'interactive' => [
+                    'type' => 'button',
+                    'body' => ['text' => "You already have an assessment in progress. Would you like to continue or start over?"],
+                    'action' => [
+                        'buttons' => [
+                            ['type' => 'reply', 'reply' => ['id' => 'continue', 'title' => 'Continue']],
+                            ['type' => 'reply', 'reply' => ['id' => 'restart', 'title' => 'Start Over']]
+                        ]
+                    ]
                 ]
             ]);
 
             return null;
         }
 
-        // Create new assessment session
+        // Ask the user which assessment plan they prefer before starting
+        $this->sendTextMessage($user->whatsapp_phone, "👋 Welcome to your personalized diet planning assistant!", [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => "Please select an assessment type:"],
+                'action' => [
+                    'buttons' => [
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'quick',
+                                'title' => 'Quick (2 min)'
+                            ]
+                        ],
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'moderate',
+                                'title' => 'Detailed (5 min)'
+                            ]
+                        ],
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'comprehensive',
+                                'title' => 'Complete (10 min)'
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]);
+
+        // Create a temporary session to track that we're waiting for assessment type selection
         $session = new AssessmentSession();
         $session->user_id = $user->id;
-        $session->current_phase = 1;
-        $session->current_question = 'age';
+        $session->current_phase = 0; // Special phase 0 for plan selection
+        $session->current_question = 'assessment_type';
         $session->responses = [];
         $session->status = 'in_progress';
         $session->started_at = now();
         $session->save();
 
+        return $session;
+    }
+
+    // Add a new method to handle the assessment type selection
+    private function handleAssessmentTypeSelection(User $user, AssessmentSession $session, string $assessmentType)
+    {
+        // Valid assessment types
+        $validTypes = ['quick', 'moderate', 'comprehensive'];
+
+        // Validate the selection
+        if (!in_array($assessmentType, $validTypes)) {
+            $this->sendTextMessage($user->whatsapp_phone, "Please select a valid assessment type.");
+
+            // Re-ask the question
+            $this->sendTextMessage($user->whatsapp_phone, "Please select an assessment type:", [
+                'type' => 'interactive',
+                'interactive' => [
+                    'type' => 'button',
+                    'body' => ['text' => "Please select an assessment type:"],
+                    'action' => [
+                        'buttons' => [
+                            ['type' => 'reply', 'reply' => ['id' => 'quick', 'title' => 'Quick (2 min)']],
+                            ['type' => 'reply', 'reply' => ['id' => 'moderate', 'title' => 'Detailed (5 min)']],
+                            ['type' => 'reply', 'reply' => ['id' => 'comprehensive', 'title' => 'Complete (10 min)']]
+                        ]
+                    ]
+                ]
+            ]);
+
+            return $session;
+        }
+
+        // Get current responses, modify, and assign back
+        $responses = $session->responses ?? [];
+        $responses['assessment_type'] = $assessmentType;
+        $session->responses = $responses;
+
+        // Load the appropriate question set
+        $this->loadAssessmentFlow($assessmentType);
+
+        // Update session to start actual assessment
+        $session->current_phase = 1;
+        $session->current_question = 'age';
+        $session->save();
+
         // Send welcome message
-        $this->sendTextMessage($user->whatsapp_phone, "👋 Welcome to your personalized diet planning assistant! I'll ask a series of questions to understand your needs and create a tailored plan. Let's get started!");
+        $this->sendTextMessage($user->whatsapp_phone, "Great! I'll now ask you a series of questions to create your personalized diet plan. Let's get started!");
 
         // Ask first question
         $this->askQuestion($user, 'age');
@@ -360,6 +446,11 @@ class WhatsAppService
      */
     private function continueAssessment(User $user, AssessmentSession $session, string $response, string $displayText = null)
     {
+        // Special handling for assessment type selection (Phase 0)
+        if ($session->current_phase === 0 && $session->current_question === 'assessment_type') {
+            return $this->handleAssessmentTypeSelection($user, $session, $response);
+        }
+
         $currentQuestion = $session->current_question;
         $responses = $session->responses ?? [];
 
@@ -405,6 +496,9 @@ class WhatsAppService
 
             return $this->startAssessment($user);
         }
+
+        Log::info('$response', (array) $response);
+        Log::info('$question', (array) $question);
 
         // Validate the response
         $isValid = $this->validateResponse($response, $question);

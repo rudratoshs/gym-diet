@@ -134,6 +134,7 @@ class GeminiService extends BaseAIService
                 $cacheKey = $this->checkRateLimit();
 
                 $prompt = $this->formatMealPrompt($dietPlan, $profile, $preferences, $day);
+                Log::info('promts for the gemini'.$prompt);
                 $endpoint = rtrim($this->apiUrl, '/') . "/models/{$this->model}:generateContent?key={$this->apiKey}";
 
                 // Make the API call

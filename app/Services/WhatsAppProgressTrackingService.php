@@ -1045,90 +1045,130 @@ class WhatsAppProgressTrackingService
      */
     public function createCalendarEntries(User $user, string $startDay = 'monday', int $daysCount = 7): string
     {
-        // Get active diet plan
-        $dietPlan = DietPlan::where('client_id', $user->id)
-            ->where('status', 'active')
-            ->latest()
-            ->first();
+        try {
+            // Get active diet plan
+            $dietPlan = DietPlan::where('client_id', $user->id)
+                ->where('status', 'active')
+                ->latest()
+                ->first();
 
-        if (!$dietPlan) {
-            return "You don't have an active diet plan to sync with your calendar.";
-        }
-
-        // Get all the days we need to process
-        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-
-        // Find start index
-        $startIndex = array_search(strtolower($startDay), $days);
-        if ($startIndex === false) {
-            $startIndex = 0; // Default to Monday if invalid day provided
-        }
-
-        // Calculate days to process
-        $daysToProcess = [];
-        for ($i = 0; $i < $daysCount; $i++) {
-            $dayIndex = ($startIndex + $i) % 7;
-            $daysToProcess[] = $days[$dayIndex];
-        }
-
-        // Get current date for the specified start day
-        $currentDate = Carbon::now();
-        $daysUntilStart = ($startIndex - $currentDate->dayOfWeekIso + 7) % 7;
-        $currentDate->addDays($daysUntilStart);
-
-        $createdCount = 0;
-        $updatedCount = 0;
-
-        // Process each day
-        foreach ($daysToProcess as $day) {
-            $mealPlan = $dietPlan->mealPlans()->where('day_of_week', $day)->first();
-
-            if (!$mealPlan) {
-                continue; // Skip days without meal plans
+            if (!$dietPlan) {
+                return "You don't have an active diet plan to sync with your calendar.";
             }
 
-            $meals = $mealPlan->meals;
-            $dayDate = $currentDate->copy()->format('Y-m-d'); // Get date for current iteration
+            // Get all the days we need to process
+            $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-            foreach ($meals as $meal) {
-                // Create or update calendar event
-                $event = CalendarEvent::firstOrNew([
-                    'user_id' => $user->id,
-                    'event_type' => 'meal',
-                    'start_time' => Carbon::parse("{$dayDate} {$meal->time_of_day}")
-                ]);
+            // Find start index
+            $startIndex = array_search(strtolower($startDay), $days);
+            if ($startIndex === false) {
+                $startIndex = 0; // Default to Monday if invalid day provided
+            }
 
-                $isNew = !$event->exists;
-                $event->title = "{$meal->title}";
-                $event->description = $meal->description;
+            // Calculate days to process
+            $daysToProcess = [];
+            for ($i = 0; $i < $daysCount; $i++) {
+                $dayIndex = ($startIndex + $i) % 7;
+                $daysToProcess[] = $days[$dayIndex];
+            }
 
-                // Calculate end time (default to 30 minutes after start)
-                $event->end_time = Carbon::parse("{$dayDate} {$meal->time_of_day}")->addMinutes(30);
+            // Get current date for the specified start day
+            $currentDate = Carbon::now();
+            $daysUntilStart = ($startIndex - $currentDate->dayOfWeekIso + 7) % 7;
+            $currentDate->addDays($daysUntilStart);
 
-                // Set reminder to 30 minutes before
-                $event->reminder_minutes = 30;
-                $event->save();
+            $createdCount = 0;
+            $updatedCount = 0;
 
-                if ($isNew) {
-                    $createdCount++;
-                } else {
-                    $updatedCount++;
+            // Process each day
+            foreach ($daysToProcess as $day) {
+                $mealPlan = $dietPlan->mealPlans()->where('day_of_week', $day)->first();
+
+                if (!$mealPlan) {
+                    continue; // Skip days without meal plans
                 }
+
+                $meals = $mealPlan->meals;
+                $dayDate = $currentDate->copy()->format('Y-m-d'); // Get date for current iteration
+
+                foreach ($meals as $meal) {
+                    // Clean and validate time format
+                    $timeOfDay = $meal->time_of_day;
+
+                    // Handle possible invalid time formats
+                    if (!preg_match('/^\d{1,2}:\d{2}(:\d{2})?$/', $timeOfDay)) {
+                        // Try to extract a valid time
+                        if (preg_match('/\d{1,2}:\d{2}(:\d{2})?/', $timeOfDay, $matches)) {
+                            $timeOfDay = $matches[0];
+                        } else {
+                            // Default to 8:00 AM if no valid time found
+                            $timeOfDay = '08:00:00';
+                        }
+                    }
+
+                    // Safely create combined datetime
+                    try {
+                        $startDateTime = Carbon::parse("{$dayDate} {$timeOfDay}");
+                        $endDateTime = $startDateTime->copy()->addMinutes(30);
+                    } catch (\Exception $e) {
+                        // Log error and use default time
+                        Log::error("Invalid time format", [
+                            'meal_id' => $meal->id,
+                            'time_of_day' => $meal->time_of_day,
+                            'error' => $e->getMessage()
+                        ]);
+
+                        $startDateTime = Carbon::parse("{$dayDate} 08:00:00");
+                        $endDateTime = $startDateTime->copy()->addMinutes(30);
+                    }
+
+                    // Create or update calendar event
+                    $event = CalendarEvent::firstOrNew([
+                        'user_id' => $user->id,
+                        'event_type' => 'meal',
+                        'start_time' => $startDateTime
+                    ]);
+
+                    $isNew = !$event->exists;
+                    $event->title = "{$meal->title}";
+                    $event->description = $meal->description;
+
+                    // Set end time
+                    $event->end_time = $endDateTime;
+
+                    // Set reminder to 30 minutes before
+                    $event->reminder_minutes = 30;
+                    $event->save();
+
+                    if ($isNew) {
+                        $createdCount++;
+                    } else {
+                        $updatedCount++;
+                    }
+                }
+
+                // Move to next day
+                $currentDate->addDay();
             }
 
-            // Move to next day
-            $currentDate->addDay();
-        }
+            if ($createdCount === 0 && $updatedCount === 0) {
+                return "No meal plans were found for the specified days.";
+            }
 
-        if ($createdCount === 0 && $updatedCount === 0) {
-            return "No meal plans were found for the specified days.";
-        }
+            return "📅 Calendar updated with your meal schedule!\n" .
+                "Created {$createdCount} new entries and updated {$updatedCount} existing ones.\n\n" .
+                "You'll receive reminders 30 minutes before each scheduled meal.";
 
-        return "📅 Calendar updated with your meal schedule!\n" .
-            "Created {$createdCount} new entries and updated {$updatedCount} existing ones.\n\n" .
-            "You'll receive reminders 30 minutes before each scheduled meal.";
+        } catch (\Exception $e) {
+            Log::error("Calendar sync error", [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return "Sorry, I encountered an error while syncing your calendar. Please try again later.";
+        }
     }
-
     /**
      * Send a WhatsApp meal reminder
      * 
