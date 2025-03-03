@@ -501,11 +501,22 @@ class WhatsAppService
             // For regular (non-custom) responses
 
             // Check if this is a multiple selection question and handle comma-separated values
-            if (isset($question['multiple']) && $question['multiple'] && strpos($response, ',') !== false) {
-                // Store as a clean array of selections
-                $responses[$currentQuestion] = array_map('trim', explode(',', $response));
+            if (isset($question['multiple']) && $question['multiple']) {
+                $values = array_map('trim', explode(',', $response));
+
+                if (!isset($responses['_multiselect_' . $currentQuestion])) {
+                    $responses['_multiselect_' . $currentQuestion] = [];
+                }
+
+                foreach ($values as $value) {
+                    if (!in_array($value, $responses['_multiselect_' . $currentQuestion])) {
+                        $responses['_multiselect_' . $currentQuestion][] = $value;
+                    }
+                }
+
+                // Store the selected options as JSON string or array
+                $responses[$currentQuestion] = $responses['_multiselect_' . $currentQuestion];
             } else {
-                // Store the standard response
                 $responses[$currentQuestion] = $response;
             }
         }
@@ -606,16 +617,21 @@ class WhatsAppService
 
             case 'list':
                 $allowedValues = array_column($question['options'], 'id');
-                // For multi-select lists, response could be comma-separated
+                $response = trim($response); // Trim input to avoid space issues
+
                 if (isset($question['multiple']) && $question['multiple']) {
-                    $values = explode(',', $response);
+                    $values = array_map('trim', explode(',', $response));
+
                     foreach ($values as $value) {
-                        if (!in_array(trim($value), $allowedValues)) {
-                            return false;
+                        if (!in_array($value, $allowedValues)) {
+                            Log::info("Invalid option found", ['value' => $value]);
+                            return false; // Invalid option detected
                         }
                     }
-                    return true;
+                    return true; // All options are valid
                 }
+
+                // Single select list validation
                 return in_array($response, $allowedValues);
 
             default:
