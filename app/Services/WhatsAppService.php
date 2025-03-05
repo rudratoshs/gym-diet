@@ -171,7 +171,6 @@ class WhatsAppService
             ->where('status', 'in_progress')
             ->first();
 
-        LOG::info('iaehrhererererererererererererererer');
         if ($existingSession) {
             $this->sendTextMessage($user->whatsapp_phone, "You already have an assessment in progress. Would you like to continue or start over?", [
                 'type' => 'interactive',
@@ -383,6 +382,7 @@ class WhatsAppService
                     'total_pages' => ceil($totalOptions / 8)
                 ];
                 $session->responses = $responses;
+                Log::info('session before save in function askQuestion  for LIST',(array)$responses);
                 $session->save();
 
                 // Create rows for the list
@@ -677,6 +677,8 @@ class WhatsAppService
         // Update session responses
         $session->responses = $responses;
         $session->current_question = $nextQuestion;
+        Log::info('session before save in function assement default',(array)$responses);
+
         $session->save();
         Log::info("Session responses after save:", ['responses' => $session->responses]);
 

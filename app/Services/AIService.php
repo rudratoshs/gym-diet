@@ -91,6 +91,18 @@ class AIService
             $profile->meal_preferences = $responses['meal_preferences'];
         }
 
+        if (isset($responses['country'])) {
+            $profile->country = $responses['country'];
+        }
+
+        if (isset($responses['state'])) {
+            $profile->state = $responses['state'];
+        }
+
+        if (isset($responses['city'])) {
+            $profile->city = $responses['city'];
+        }
+
         $profile->save();
 
         return $profile;
@@ -458,12 +470,29 @@ Format your response as a valid JSON array of meal objects.";
     {
         $goalType = $responses['primary_goal'] ?? 'weight_loss';
 
+        // Default macro distribution
         $macros = [
             'protein' => 0,
             'carbs' => 0,
             'fats' => 0,
         ];
 
+        // Handle special diet types first
+        if ($dietType === 'keto') {
+            return [
+                'protein' => round(($calories * 0.25) / 4), // 25% protein
+                'carbs' => round(($calories * 0.05) / 4),   // 5% carbs
+                'fats' => round(($calories * 0.7) / 9),     // 70% fats
+            ];
+        } elseif ($dietType === 'high_protein') {
+            return [
+                'protein' => round(($calories * 0.4) / 4),  // 40% protein
+                'carbs' => round(($calories * 0.3) / 4),    // 30% carbs
+                'fats' => round(($calories * 0.3) / 9),     // 30% fats
+            ];
+        }
+
+        // Goal-based macros
         switch ($goalType) {
             case 'weight_loss':
                 $macros['protein'] = round(($calories * 0.3) / 4); // 30% protein
@@ -487,17 +516,6 @@ Format your response as a valid JSON array of meal objects.";
                 $macros['protein'] = round(($calories * 0.3) / 4); // 30% protein
                 $macros['carbs'] = round(($calories * 0.4) / 4);   // 40% carbs
                 $macros['fats'] = round(($calories * 0.3) / 9);    // 30% fats
-        }
-
-        // Adjust for diet type
-        if ($dietType === 'keto') {
-            $macros['protein'] = round(($calories * 0.25) / 4); // 25% protein
-            $macros['carbs'] = round(($calories * 0.05) / 4);   // 5% carbs
-            $macros['fats'] = round(($calories * 0.7) / 9);     // 70% fats
-        } elseif ($dietType === 'high_protein') {
-            $macros['protein'] = round(($calories * 0.4) / 4);  // 40% protein
-            $macros['carbs'] = round(($calories * 0.3) / 4);    // 30% carbs
-            $macros['fats'] = round(($calories * 0.3) / 9);     // 30% fats
         }
 
         return $macros;

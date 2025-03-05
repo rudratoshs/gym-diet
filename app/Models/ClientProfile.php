@@ -35,6 +35,15 @@ class ClientProfile extends Model
         'measurement_preference',
         'plan_type',
         'meal_preferences',
+        'country',
+        'state',
+        'city',
+        // Add the missing fields
+        'medications',
+        'medication_details',
+        'commitment_level',
+        'additional_requests',
+        'meal_variety'
     ];
 
     protected $casts = [
@@ -44,8 +53,9 @@ class ClientProfile extends Model
         'cuisine_preferences' => 'array',
         'food_restrictions' => 'array',
         'meal_preferences' => 'array',
+        // Add new JSON field
+        'medications' => 'array',
     ];
-
     // Relationships
     public function user()
     {

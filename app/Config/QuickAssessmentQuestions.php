@@ -22,8 +22,26 @@ class QuickAssessmentQuestions
                 'type' => 'text',
                 'validation' => 'numeric|min:12|max:120',
                 'error_message' => $t['age_error'],
-                'next' => 'gender',
+                'next' => 'country',
                 'phase' => 1
+            ],
+            'country' => [
+                'prompt' => $t['country_prompt'],
+                'type' => 'text',
+                'next' => 'state',
+                'phase' => 2
+            ],
+            'state' => [
+                'prompt' => $t['state_prompt'],
+                'type' => 'text',
+                'next' => 'city',
+                'phase' => 2
+            ],
+            'city' => [
+                'prompt' => $t['city_prompt'],
+                'type' => 'text',
+                'next' => 'gender',
+                'phase' => 2
             ],
             'gender' => [
                 'prompt' => $t['gender_prompt'],
@@ -51,6 +69,21 @@ class QuickAssessmentQuestions
             'target_weight' => [
                 'prompt' => $t['target_weight_prompt'],
                 'type' => 'text',
+                'next' => 'body_type',
+                'phase' => 1
+            ],
+            'body_type' => [
+                'prompt' => $t['body_type_prompt'],
+                'type' => 'list',
+                'header' => $t['body_type_header'],
+                'body' => $t['body_type_body'],
+                'options' => [
+                    ['id' => '1', 'title' => $t['ectomorph']],
+                    ['id' => '2', 'title' => $t['mesomorph']],
+                    ['id' => '3', 'title' => $t['endomorph']],
+                    ['id' => '4', 'title' => $t['combination']],
+                    ['id' => '5', 'title' => $t['not_sure']]
+                ],
                 'next' => 'activity_level',
                 'phase' => 1
             ],
@@ -66,11 +99,29 @@ class QuickAssessmentQuestions
                     ['id' => '4', 'title' => $t['very_active']],
                     ['id' => '5', 'title' => $t['extreme_active']]
                 ],
+                'next' => 'medical_history',
+                'phase' => 1
+            ],
+            'medical_history' => [
+                'prompt' => $t['medical_history_prompt'],
+                'type' => 'list',
+                'multiple' => true,
+                'header' => $t['medical_history_header'],
+                'body' => $t['medical_history_body'],
+                'options' => [
+                    ['id' => '1', 'title' => $t['heart_disease']],
+                    ['id' => '2', 'title' => $t['high_cholesterol']],
+                    ['id' => '3', 'title' => $t['hypertension']],
+                    ['id' => '4', 'title' => $t['diabetes']],
+                    ['id' => '5', 'title' => $t['cancer']],
+                    ['id' => '6', 'title' => $t['autoimmune']],
+                    ['id' => '7', 'title' => $t['gastrointestinal']],
+                    ['id' => '8', 'title' => $t['mental_health']],
+                    ['id' => '9', 'title' => $t['none_medical']]
+                ],
                 'next' => 'diet_type',
                 'phase' => 1
             ],
-
-            // Skip directly to Diet Type in quick assessment
             'diet_type' => [
                 'prompt' => $t['diet_prompt'],
                 'type' => 'list',
@@ -119,6 +170,38 @@ class QuickAssessmentQuestions
                     ['id' => '4', 'title' => $t['energy']],
                     ['id' => '5', 'title' => $t['health']],
                     ['id' => '6', 'title' => $t['other_goal']]
+                ],
+                'next' => 'weight_goal',
+                'phase' => 6
+            ],
+            'weight_goal' => [
+                'prompt' => $t['weight_goal_prompt'],
+                'type' => 'list',
+                'header' => $t['weight_goal_header'],
+                'body' => $t['weight_goal_body'],
+                'options' => [
+                    ['id' => '1', 'title' => $t['rapid_loss']],
+                    ['id' => '2', 'title' => $t['moderate_loss']],
+                    ['id' => '3', 'title' => $t['slow_loss']],
+                    ['id' => '4', 'title' => $t['maintain']],
+                    ['id' => '5', 'title' => $t['slight_gain']],
+                    ['id' => '6', 'title' => $t['moderate_gain']],
+                    ['id' => '7', 'title' => $t['significant_gain']]
+                ],
+                'next' => 'water_intake',
+                'phase' => 6
+            ],
+            'water_intake' => [
+                'prompt' => $t['water_intake_prompt'],
+                'type' => 'list',
+                'header' => $t['water_intake_header'],
+                'body' => $t['water_intake_body'],
+                'options' => [
+                    ['id' => '1', 'title' => $t['water_lt1']],
+                    ['id' => '2', 'title' => $t['water_1to2']],
+                    ['id' => '3', 'title' => $t['water_2to3']],
+                    ['id' => '4', 'title' => $t['water_gt3']],
+                    ['id' => '5', 'title' => $t['water_unknown']]
                 ],
                 'next' => 'plan_type',
                 'phase' => 6

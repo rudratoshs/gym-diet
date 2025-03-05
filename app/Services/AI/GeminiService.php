@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Carbon\Carbon;
+use App\Services\OptionMappingService;
 use Exception;
 
 class GeminiService extends BaseAIService
@@ -134,7 +135,7 @@ class GeminiService extends BaseAIService
                 $cacheKey = $this->checkRateLimit();
 
                 $prompt = $this->formatMealPrompt($dietPlan, $profile, $preferences, $day);
-                Log::info('promts for the gemini'.$prompt);
+                Log::info('promts for the gemini' . $prompt);
                 $endpoint = rtrim($this->apiUrl, '/') . "/models/{$this->model}:generateContent?key={$this->apiKey}";
 
                 // Make the API call
@@ -292,77 +293,330 @@ class GeminiService extends BaseAIService
     /**
      * Format prompt for Gemini
      */
-    protected function formatMealPrompt($dietPlan, $profile, $preferences, $day)
+    protected function formatMealPrompt($dietPlan, $profile, $preferences, $day, $assessmentLevel = 'moderate')
     {
-        // Get diet type and health conditions from profile or preferences
-        $dietType = $profile->diet_type ?? 'balanced';
-        $healthConditions = $preferences['health_conditions'] ?? ['none'];
-        $allergies = $preferences['allergies'] ?? ['none'];
-        $cuisinePreferences = $preferences['cuisine_preferences'] ?? ['no_preference'];
+        // Log raw inputs for debugging
+        Log::info('Raw meal prompt inputs', [
+            'diet_plan' => $dietPlan->toArray(),
+            'profile_raw' => $profile->getAttributes(),
+            'preferences' => $preferences,
+            'day' => $day,
+            'assessment_level' => $assessmentLevel
+        ]);
 
-        // Additional preferences
-        $mealTiming = $profile->meal_timing ?? 'traditional';
-        $cookingCapability = $preferences['cooking_capability'] ?? 'basic';
+        // Transform the profile data to replace IDs with labels
+        $transformedProfile = OptionMappingService::transformData($profile->getAttributes());
 
-        // Format health conditions and allergies for prompt
-        $healthConditionsStr = is_array($healthConditions) ? implode(', ', $healthConditions) : $healthConditions;
+        // Transform preference data if it's different from profile data
+        $transformedPreferences = $preferences;
+        if (isset($preferences['profile'])) {
+            unset($transformedPreferences['profile']); // Remove the profile to avoid duplication
+        }
+        $transformedPreferences = OptionMappingService::transformData($transformedPreferences);
+
+        // Log transformed data
+        Log::info('Transformed data for prompt', [
+            'transformed_profile' => $transformedProfile,
+            'transformed_preferences' => $transformedPreferences
+        ]);
+
+        // Core user information (available at all assessment levels)
+        $age = $transformedProfile['age'] ?? 30;
+        $gender = $transformedProfile['gender'] ?? 'not_specified';
+        $currentWeight = $transformedProfile['current_weight'] ?? 70;
+        $height = $transformedProfile['height'] ?? 170;
+        $targetWeight = $transformedProfile['target_weight'] ?? $currentWeight;
+        $activityLevel = $transformedProfile['activity_level'] ?? 'moderate';
+
+        // Diet type and allergies (available at all assessment levels)
+        $dietType = $transformedProfile['diet_type'] ?? 'balanced';
+
+        // Handle allergies (could be array or comma-separated string)
+        $allergies = $transformedProfile['allergies'] ?? ['none'];
         $allergiesStr = is_array($allergies) ? implode(', ', $allergies) : $allergies;
-        $cuisineStr = is_array($cuisinePreferences) ? implode(', ', $cuisinePreferences) : $cuisinePreferences;
+
+        // Goal information (available at all assessment levels)
+        $primaryGoal = $transformedProfile['primary_goal'] ?? 'health';
+
+        // Geographic data (important for regional cuisine preferences)
+        $country = $transformedProfile['country'] ?? '';
+        $state = $transformedProfile['state'] ?? '';
+        $city = $transformedProfile['city'] ?? '';
+
+        // Format base prompt with information available at all levels
+        $prompt = "Create a detailed meal plan for {$day} for a person with the following characteristics:
+- Age: {$age}
+- Gender: {$gender}
+- Current weight: {$currentWeight} kg
+- Target weight: {$targetWeight} kg
+- Height: {$height} cm
+- Activity level: {$activityLevel}
+- Diet type: {$dietType}
+- Primary goal: {$primaryGoal}
+- Daily calorie target: {$dietPlan->daily_calories} calories
+- Protein: {$dietPlan->protein_grams}g
+- Carbs: {$dietPlan->carbs_grams}g
+- Fats: {$dietPlan->fats_grams}g
+- Allergies/Intolerances: {$allergiesStr}";
+
+        // Add location information if available
+        if (!empty($country)) {
+            $location = trim("$city, $state, $country", ', ');
+            $prompt .= "\n- Location: {$location}";
+        }
+
+        // Moderate assessment adds more health and preference data
+        if ($assessmentLevel == 'moderate' || $assessmentLevel == 'comprehensive') {
+            // Health conditions
+            $healthConditions = $transformedProfile['health_conditions'] ?? ['none'];
+            $healthConditionsStr = is_array($healthConditions) ? implode(', ', $healthConditions) : $healthConditions;
+
+            // Food preferences
+            $foodRestrictions = $transformedProfile['food_restrictions'] ?? ['none'];
+            $foodRestrictionsStr = is_array($foodRestrictions) ? implode(', ', $foodRestrictions) : $foodRestrictions;
+
+            // Exercise pattern
+            $exerciseRoutine = $transformedProfile['exercise_routine'] ?? 'moderate';
+
+            // Timeline
+            $timeline = $transformedProfile['goal_timeline'] ?? 'medium-term';
+
+            $prompt .= "
+- Health conditions: {$healthConditionsStr}
+- Food restrictions: {$foodRestrictionsStr}
+- Exercise routine: {$exerciseRoutine}
+- Timeline for goals: {$timeline}";
+        }
+
+        // Comprehensive assessment adds even more detailed information
+        if ($assessmentLevel == 'comprehensive') {
+            // Cuisine preferences
+            $cuisinePreferences = $transformedProfile['cuisine_preferences'] ?? ['no_preference'];
+            $cuisineStr = is_array($cuisinePreferences) ? implode(', ', $cuisinePreferences) : $cuisinePreferences;
+
+            // Meal timing
+            $mealTiming = $transformedProfile['meal_timing'] ?? 'traditional';
+
+            // Lifestyle factors
+            $dailySchedule = $transformedProfile['daily_schedule'] ?? 'standard';
+            $cookingCapability = $transformedProfile['cooking_capability'] ?? 'basic';
+            $stressSleep = $transformedProfile['stress_sleep'] ?? 'moderate';
+
+            // Recovery needs if applicable
+            $recoveryNeeds = $transformedProfile['recovery_needs'] ?? ['none'];
+            $recoveryNeedsStr = is_array($recoveryNeeds) ? implode(', ', $recoveryNeeds) : $recoveryNeeds;
+
+            $prompt .= "
+- Cuisine preferences: {$cuisineStr}
+- Meal timing preference: {$mealTiming}
+- Daily schedule: {$dailySchedule}
+- Cooking capability: {$cookingCapability}
+- Stress & sleep pattern: {$stressSleep}
+- Recovery needs: {$recoveryNeedsStr}";
+
+            // Add any additional detailed requests
+            if (isset($transformedProfile['health_details']) && !empty($transformedProfile['health_details'])) {
+                $prompt .= "\n- Health details: {$transformedProfile['health_details']}";
+            }
+        }
 
         // Determine number of meals based on meal timing preference
         $mealCount = 3; // Default
         $mealTypes = "'breakfast', 'lunch', 'dinner'";
 
-        if ($mealTiming == 'frequent') {
-            $mealCount = 6;
-            $mealTypes = "'breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner', 'evening_snack'";
-        } elseif ($mealTiming == 'intermittent') {
-            $mealCount = 2;
-            $mealTypes = "'lunch', 'dinner'";
-        } elseif ($mealTiming == 'omad') {
-            $mealCount = 1;
-            $mealTypes = "'dinner'";
+        // Only change meal count if we have timing info (moderate or comprehensive)
+        if ($assessmentLevel != 'quick' && isset($transformedProfile['meal_timing'])) {
+            $timing = $transformedProfile['meal_timing'];
+
+            if ($timing == 'small_frequent' || $timing == 'frequent') {
+                $mealCount = 6;
+                $mealTypes = "'breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner', 'evening_snack'";
+            } elseif ($timing == 'intermittent' || $timing == 'intermittent_fasting') {
+                $mealCount = 2;
+                $mealTypes = "'lunch', 'dinner'";
+            } elseif ($timing == 'omad' || $timing == 'one_meal') {
+                $mealCount = 1;
+                $mealTypes = "'dinner'";
+            }
         }
 
-        // Build the prompt
-        return "Create a detailed meal plan for {$day} for a person with the following characteristics:
-- Age: {$profile->age}
-- Gender: {$profile->gender}
-- Current weight: {$profile->current_weight} kg
-- Height: {$profile->height} cm
-- Activity level: {$profile->activity_level}
-- Diet type: {$dietType}
-- Daily calorie target: {$dietPlan->daily_calories} calories
-- Protein: {$dietPlan->protein_grams}g
-- Carbs: {$dietPlan->carbs_grams}g
-- Fats: {$dietPlan->fats_grams}g
-- Health conditions: {$healthConditionsStr}
-- Allergies: {$allergiesStr}
-- Cuisine preferences: {$cuisineStr}
-- Cooking capability: {$cookingCapability}
+        // Complete the prompt with meal details request
+        $prompt .= "
 
 Include {$mealCount} meals: {$mealTypes}.
 
 For each meal, provide:
 1. meal_type (e.g., breakfast, lunch, dinner, etc.)
 2. title
-3. description
+3. description";
+
+
+        // Adjust level of detail based on assessment type
+        if ($assessmentLevel == 'quick') {
+            $prompt .= "
 4. calories
 5. protein_grams
 6. carbs_grams
 7. fats_grams
 8. time_of_day (e.g., 08:00)
-9. recipe with ingredients and instructions
+9. recipe with basic ingredients list";
+        } elseif ($assessmentLevel == 'moderate') {
+            $prompt .= "
+4. calories
+5. protein_grams
+6. carbs_grams
+7. fats_grams
+8. time_of_day (e.g., 08:00)
+9. recipe with ingredients and simple instructions";
+        } else { // comprehensive
+            $prompt .= "
+4. calories
+5. protein_grams
+6. carbs_grams
+7. fats_grams
+8. time_of_day (e.g., 08:00)
+9. recipe with detailed ingredients (with measurements) and step-by-step instructions
+10. nutritional benefits
+11. prep time and cooking time";
+        }
+
+        // Add goal-specific instructions
+        $prompt .= $this->getGoalSpecificInstructions($primaryGoal);
+        $region = trim("$city, $state, $country", ', '); // Combine non-empty values
+        $regionStr = $region ? "- Regional cuisine preference: {$region}" : "";
+
+        // Final instructions
+        $prompt .= "
 
 Make sure:
-- The total calories are approximately {$dietPlan->daily_calories} calories for the day
-- The total macronutrients approximately match the daily targets
-- All meals respect the dietary restrictions and allergies
-- Recipes are appropriate for the person's cooking capability
-- Preferred cuisines are incorporated
+- The total calories for all meals add up to approximately {$dietPlan->daily_calories} calories for the day
+- The total macronutrients approximately match the daily targets: {$dietPlan->protein_grams}g protein, {$dietPlan->carbs_grams}g carbs, {$dietPlan->fats_grams}g fats
+- All meals respect the dietary restrictions and allergies";
 
-Format your response as a valid JSON array of meal objects. DO NOT include any explanation, just the JSON array.";
+        if ($assessmentLevel != 'quick') {
+            $prompt .= "
+- Recipes are appropriate for the person's cooking capability
+- The meal plan aligns with the person's primary goal: {$primaryGoal}";
+
+            if (isset($cuisinePreferences) && $cuisinePreferences != 'no_preference') {
+                $prompt .= "
+- Incorporate the preferred cuisines: {$cuisineStr}";
+            }
+        }
+
+        if ($assessmentLevel == 'comprehensive') {
+            $prompt .= "
+- Consider the person's stress and sleep patterns when recommending evening meals
+- Take into account the person's cooking time availability
+- Provide realistic recipes that match the person's commitment level
+- Include variety according to the person's preference";
+
+            if ($regionStr) {
+                $prompt .= "
+- Incorporate regional cuisine preferences where possible";
+            }
+        }
+
+        $prompt .= "
+
+Format your response as a valid JSON array of meal objects. Each meal should be a complete object with all the requested fields. DO NOT include any explanation, just the JSON array.";
+
+        return $prompt;
     }
+
+
+    /**
+     * Get goal-specific instructions for the meal plan
+     */
+    private function getGoalSpecificInstructions($primaryGoal)
+    {
+        $instructions = "\n\nBased on the primary goal of '{$primaryGoal}', focus on:";
+
+        switch (strtolower($primaryGoal)) {
+            case 'weight_loss':
+            case 'weight loss':
+                $instructions .= "
+- Foods with high satiety but lower calorie density
+- Higher protein content to preserve muscle mass
+- Complex carbohydrates over simple sugars
+- Balanced meals that prevent hunger and cravings
+- Adequate fiber to promote fullness";
+                break;
+
+            case 'muscle_gain':
+            case 'muscle gain':
+                $instructions .= "
+- Higher protein intake across all meals
+- Nutrient timing (especially around workouts)
+- Sufficient complex carbohydrates for energy and recovery
+- Healthy fats to support hormone production
+- Nutrient-dense foods for overall recovery";
+                break;
+
+            case 'maintain':
+            case 'maintain weight':
+                $instructions .= "
+- Balanced macronutrient distribution
+- Focus on whole, unprocessed foods
+- Stable meal timing and portion sizes
+- Nutrient density for overall health
+- Sustainable and enjoyable food choices";
+                break;
+
+            case 'energy':
+            case 'better energy':
+            case 'energy improvement':
+                $instructions .= "
+- Complex carbohydrates for sustained energy
+- Regular protein intake throughout the day
+- Anti-inflammatory foods
+- Foods rich in B vitamins, iron, and magnesium
+- Proper hydration recommendations with each meal";
+                break;
+
+            case 'health':
+            case 'improved health':
+            case 'overall health':
+                $instructions .= "
+- Variety of colorful vegetables and fruits
+- Anti-inflammatory foods
+- Heart-healthy fats and oils
+- Balanced macronutrients
+- Foods known to support immune function";
+                break;
+
+            case 'athletic performance':
+            case 'performance':
+                $instructions .= "
+- Properly timed pre-workout nutrition
+- Post-workout recovery meals
+- Adequate carbohydrates for performance
+- Protein distribution throughout the day
+- Foods that support endurance and strength";
+                break;
+
+            case 'recovery':
+            case 'recovery from condition':
+                $instructions .= "
+- Anti-inflammatory foods
+- Nutrient-dense healing foods
+- Easy-to-digest options when appropriate
+- Foods that support the specific recovery needs mentioned
+- Adequate protein for tissue repair";
+                break;
+
+            default:
+                $instructions .= "
+- Balance of macronutrients
+- Whole food sources
+- Nutrient density
+- Dietary adherence through enjoyable meals
+- Overall health promotion";
+        }
+
+        return $instructions;
+    }
+
 
     /**
      * Create or update meal from data

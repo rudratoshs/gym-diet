@@ -69,6 +69,19 @@ abstract class BaseAIService implements AIServiceInterface
             $profile->age = $responses['age'];
         }
 
+        // Location Information
+        if (isset($responses['country'])) {
+            $profile->country = $responses['country'];
+        }
+
+        if (isset($responses['state'])) {
+            $profile->state = $responses['state'];
+        }
+
+        if (isset($responses['city'])) {
+            $profile->city = $responses['city'];
+        }
+
         if (isset($responses['gender'])) {
             $profile->gender = strtolower($responses['gender']);
         }
@@ -97,6 +110,16 @@ abstract class BaseAIService implements AIServiceInterface
             // Add health condition details if available
             if (isset($responses['health_details'])) {
                 $profile->health_details = $responses['health_details'];
+            }
+        }
+
+        // Medications (from Comprehensive Assessment)
+        if (isset($responses['medications'])) {
+            $profile->medications = $this->formatListResponse($responses['medications']);
+
+            // Add medication details if available
+            if (isset($responses['medication_details'])) {
+                $profile->medication_details = $responses['medication_details'];
             }
         }
 
@@ -130,6 +153,11 @@ abstract class BaseAIService implements AIServiceInterface
             $profile->food_restrictions = $this->formatListResponse($responses['food_restrictions']);
         }
 
+        // Meal Variety (from Comprehensive Assessment)
+        if (isset($responses['meal_variety'])) {
+            $profile->meal_variety = $this->mapMealVariety($responses['meal_variety']);
+        }
+
         // Lifestyle (Phase 4)
         if (isset($responses['daily_schedule'])) {
             $profile->daily_schedule = $this->mapDailySchedule($responses['daily_schedule']);
@@ -156,8 +184,18 @@ abstract class BaseAIService implements AIServiceInterface
             $profile->goal_timeline = $this->mapTimeline($responses['timeline']);
         }
 
+        // Commitment Level (from Comprehensive Assessment)
+        if (isset($responses['commitment_level'])) {
+            $profile->commitment_level = $this->mapCommitmentLevel($responses['commitment_level']);
+        }
+
         if (isset($responses['measurement_preference'])) {
             $profile->measurement_preference = $this->mapMeasurementPreference($responses['measurement_preference']);
+        }
+
+        // Additional Requests (from Comprehensive Assessment)
+        if (isset($responses['additional_requests'])) {
+            $profile->additional_requests = $responses['additional_requests'];
         }
 
         // Plan Customization (Phase 6)
@@ -315,9 +353,7 @@ abstract class BaseAIService implements AIServiceInterface
                         'Cook oats with milk. Top with fruits and honey.'
                     ]
                 ]
-            ],
-            // Other meals remain the same
-            // ...
+            ], 
         ];
 
         foreach ($defaultMeals as $mealData) {
@@ -367,18 +403,33 @@ abstract class BaseAIService implements AIServiceInterface
         return round($bmr * $multiplier);
     }
 
-    protected function calculateMacros($calories, $dietType, $responses)
+    private function calculateMacros($calories, $dietType, $responses)
     {
-        // Get primary goal from responses for more accurate macro calculation
-        $primaryGoal = $responses['primary_goal'] ?? 'health';
-        $goalType = $this->mapPrimaryGoal($primaryGoal);
+        $goalType = $responses['primary_goal'] ?? 'weight_loss';
 
+        // Default macro distribution
         $macros = [
             'protein' => 0,
             'carbs' => 0,
             'fats' => 0,
         ];
 
+        // Handle special diet types first
+        if ($dietType === 'keto') {
+            return [
+                'protein' => round(($calories * 0.25) / 4), // 25% protein
+                'carbs' => round(($calories * 0.05) / 4),   // 5% carbs
+                'fats' => round(($calories * 0.7) / 9),     // 70% fats
+            ];
+        } elseif ($dietType === 'high_protein') {
+            return [
+                'protein' => round(($calories * 0.4) / 4),  // 40% protein
+                'carbs' => round(($calories * 0.3) / 4),    // 30% carbs
+                'fats' => round(($calories * 0.3) / 9),     // 30% fats
+            ];
+        }
+
+        // Goal-based macros
         switch ($goalType) {
             case 'weight_loss':
                 $macros['protein'] = round(($calories * 0.3) / 4); // 30% protein
@@ -392,36 +443,16 @@ abstract class BaseAIService implements AIServiceInterface
                 $macros['fats'] = round(($calories * 0.2) / 9);    // 20% fats
                 break;
 
-            case 'energy':
-                $macros['protein'] = round(($calories * 0.2) / 4);  // 20% protein
-                $macros['carbs'] = round(($calories * 0.55) / 4);   // 55% carbs
-                $macros['fats'] = round(($calories * 0.25) / 9);    // 25% fats
-                break;
-
-            case 'athletic':
-                $macros['protein'] = round(($calories * 0.3) / 4);  // 30% protein
-                $macros['carbs'] = round(($calories * 0.5) / 4);    // 50% carbs
-                $macros['fats'] = round(($calories * 0.2) / 9);     // 20% fats
-                break;
-
-            case 'health':
-            case 'recovery':
-            case 'longevity':
-            default:
+            case 'maintenance':
                 $macros['protein'] = round(($calories * 0.25) / 4); // 25% protein
                 $macros['carbs'] = round(($calories * 0.5) / 4);   // 50% carbs
                 $macros['fats'] = round(($calories * 0.25) / 9);   // 25% fats
-        }
+                break;
 
-        // Adjust for diet type
-        if ($dietType === 'keto') {
-            $macros['protein'] = round(($calories * 0.25) / 4); // 25% protein
-            $macros['carbs'] = round(($calories * 0.05) / 4);   // 5% carbs
-            $macros['fats'] = round(($calories * 0.7) / 9);     // 70% fats
-        } elseif ($dietType === 'high_protein') {
-            $macros['protein'] = round(($calories * 0.4) / 4);  // 40% protein
-            $macros['carbs'] = round(($calories * 0.3) / 4);    // 30% carbs
-            $macros['fats'] = round(($calories * 0.3) / 9);     // 30% fats
+            default:
+                $macros['protein'] = round(($calories * 0.3) / 4); // 30% protein
+                $macros['carbs'] = round(($calories * 0.4) / 4);   // 40% carbs
+                $macros['fats'] = round(($calories * 0.3) / 9);    // 30% fats
         }
 
         return $macros;
@@ -678,6 +709,31 @@ abstract class BaseAIService implements AIServiceInterface
         ];
 
         return $map[$preference] ?? 'combination';
+    }
+
+    protected function mapMealVariety($value)
+    {
+        $map = [
+            '1' => 'high_variety',
+            '2' => 'moderate_var',
+            '3' => 'limited_var',
+            '4' => 'repetitive'
+        ];
+
+        return $map[$value] ?? 'moderate_var';
+    }
+
+    protected function mapCommitmentLevel($value)
+    {
+        $map = [
+            '1' => 'very_committed',
+            '2' => 'mostly',
+            '3' => 'moderate',
+            '4' => 'flexible',
+            '5' => 'gradual'
+        ];
+
+        return $map[$value] ?? 'moderate';
     }
 
     /**
