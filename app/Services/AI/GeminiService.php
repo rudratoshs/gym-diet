@@ -343,6 +343,10 @@ class GeminiService extends BaseAIService
         $state = $transformedProfile['state'] ?? '';
         $city = $transformedProfile['city'] ?? '';
 
+        // Current season and weather (estimated based on location and current date)
+        $season = $this->estimateCurrentSeason($country);
+        $weather = $this->estimateCurrentWeather($country, $city);
+
         // Format base prompt with information available at all levels
         $prompt = "Create a detailed meal plan for {$day} for a person with the following characteristics:
 - Age: {$age}
@@ -363,6 +367,8 @@ class GeminiService extends BaseAIService
         if (!empty($country)) {
             $location = trim("$city, $state, $country", ', ');
             $prompt .= "\n- Location: {$location}";
+            $prompt .= "\n- Current season: {$season}";
+            $prompt .= "\n- Current weather: {$weather}";
         }
 
         // Moderate assessment adds more health and preference data
@@ -420,25 +426,8 @@ class GeminiService extends BaseAIService
             }
         }
 
-        // Determine number of meals based on meal timing preference
-        $mealCount = 3; // Default
-        $mealTypes = "'breakfast', 'lunch', 'dinner'";
-
-        // Only change meal count if we have timing info (moderate or comprehensive)
-        if ($assessmentLevel != 'quick' && isset($transformedProfile['meal_timing'])) {
-            $timing = $transformedProfile['meal_timing'];
-
-            if ($timing == 'small_frequent' || $timing == 'frequent') {
-                $mealCount = 6;
-                $mealTypes = "'breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner', 'evening_snack'";
-            } elseif ($timing == 'intermittent' || $timing == 'intermittent_fasting') {
-                $mealCount = 2;
-                $mealTypes = "'lunch', 'dinner'";
-            } elseif ($timing == 'omad' || $timing == 'one_meal') {
-                $mealCount = 1;
-                $mealTypes = "'dinner'";
-            }
-        }
+        // Determine number of meals and meal types based on goal and meal timing
+        list($mealCount, $mealTypes) = $this->determineMealsBasedOnGoal($primaryGoal, $transformedProfile, $assessmentLevel);
 
         // Complete the prompt with meal details request
         $prompt .= "
@@ -447,9 +436,8 @@ Include {$mealCount} meals: {$mealTypes}.
 
 For each meal, provide:
 1. meal_type (e.g., breakfast, lunch, dinner, etc.)
-2. title
+2. title (unique and descriptive)
 3. description";
-
 
         // Adjust level of detail based on assessment type
         if ($assessmentLevel == 'quick') {
@@ -459,7 +447,8 @@ For each meal, provide:
 6. carbs_grams
 7. fats_grams
 8. time_of_day (e.g., 08:00)
-9. recipe with basic ingredients list";
+9. recipe with ingredients (with EXACT measurements in grams for each ingredient) and simple instructions
+10. preparation_time";
         } elseif ($assessmentLevel == 'moderate') {
             $prompt .= "
 4. calories
@@ -467,7 +456,8 @@ For each meal, provide:
 6. carbs_grams
 7. fats_grams
 8. time_of_day (e.g., 08:00)
-9. recipe with ingredients and simple instructions";
+9. recipe with ingredients (with EXACT measurements in grams for each ingredient) and detailed instructions
+10. preparation_time";
         } else { // comprehensive
             $prompt .= "
 4. calories
@@ -475,45 +465,46 @@ For each meal, provide:
 6. carbs_grams
 7. fats_grams
 8. time_of_day (e.g., 08:00)
-9. recipe with detailed ingredients (with measurements) and step-by-step instructions
+9. recipe with detailed ingredients (with EXACT measurements in grams) and step-by-step instructions
 10. nutritional benefits
-11. prep time and cooking time";
+11. preparation_time
+12. cooking_time";
         }
 
-        // Add goal-specific instructions
-        $prompt .= $this->getGoalSpecificInstructions($primaryGoal);
+        // Add goal-specific instructions with enhanced personalization
+        $prompt .= $this->getEnhancedGoalSpecificInstructions($primaryGoal, $transformedProfile, $exerciseRoutine ?? 'moderate');
+
+        // Get regional preferences
         $region = trim("$city, $state, $country", ', '); // Combine non-empty values
         $regionStr = $region ? "- Regional cuisine preference: {$region}" : "";
 
-        // Final instructions
+        // Add detailed dietitian best practices
+        $prompt .= $this->getDietitianBestPractices($primaryGoal, $season, $weather);
+
+        // Final instructions with enhanced verification and requirements
         $prompt .= "
 
-Make sure:
-- The total calories for all meals add up to approximately {$dietPlan->daily_calories} calories for the day
-- The total macronutrients approximately match the daily targets: {$dietPlan->protein_grams}g protein, {$dietPlan->carbs_grams}g carbs, {$dietPlan->fats_grams}g fats
-- All meals respect the dietary restrictions and allergies";
+IMPORTANT REQUIREMENTS:
+- Create ORIGINAL recipes that incorporate local cuisine and ingredients" . ($region ? " from $region" : "") . "
+- Prioritize locally available and SEASONAL produce appropriate for {$season} in " . ($country ? $country : "your region") . "
+- Each main meal MUST include a side salad component or vegetable preparation using regional vegetables
+- Include at least one traditional " . ($country ? $country . "n" : "regional") . " protein-rich beverage or smoothie
+- Balance traditional ingredients with nutrition science for {$primaryGoal}
+- Use a VARIETY of protein sources (include at least 3-4 different sources throughout the day)
+- Adapt recipes to the current {$weather} weather
+
+MANDATORY VERIFICATION CHECKLIST:
+- The total calories MUST add up to exactly {$dietPlan->daily_calories} calories (±20 calories)
+- The total macronutrients MUST match the daily targets: {$dietPlan->protein_grams}g protein, {$dietPlan->carbs_grams}g carbs, {$dietPlan->fats_grams}g fats (±2g)
+- All meals strictly respect the dietary restrictions and allergies: {$allergiesStr}
+- Each recipe MUST have EXACT measurements in grams for EVERY ingredient
+- Each recipe has a unique flavor profile (avoid repetition of taste profiles)
+- Include EXACT preparation time estimates for each recipe";
 
         if ($assessmentLevel != 'quick') {
-            $prompt .= "
-- Recipes are appropriate for the person's cooking capability
-- The meal plan aligns with the person's primary goal: {$primaryGoal}";
-
+            $prompt .= " - Recipes are appropriate for the person's cooking capability: " . (isset($cookingCapability) ? $cookingCapability : 'basic') . " - The meal plan aligns with the person's primary goal: {$primaryGoal}";
             if (isset($cuisinePreferences) && $cuisinePreferences != 'no_preference') {
-                $prompt .= "
-- Incorporate the preferred cuisines: {$cuisineStr}";
-            }
-        }
-
-        if ($assessmentLevel == 'comprehensive') {
-            $prompt .= "
-- Consider the person's stress and sleep patterns when recommending evening meals
-- Take into account the person's cooking time availability
-- Provide realistic recipes that match the person's commitment level
-- Include variety according to the person's preference";
-
-            if ($regionStr) {
-                $prompt .= "
-- Incorporate regional cuisine preferences where possible";
+                $prompt .= " - Incorporate the preferred cuisines: {$cuisineStr}";
             }
         }
 
@@ -522,6 +513,335 @@ Make sure:
 Format your response as a valid JSON array of meal objects. Each meal should be a complete object with all the requested fields. DO NOT include any explanation, just the JSON array.";
 
         return $prompt;
+    }
+    /**
+     * Determine number of meals and meal types based on goal and user preferences
+     */
+    protected function determineMealsBasedOnGoal($primaryGoal, $profile, $assessmentLevel)
+    {
+        // Default meal structure
+        $mealCount = 3;
+        $mealTypes = "'breakfast', 'lunch', 'dinner'";
+
+        // Get the meal timing preference if available
+        $mealTiming = $profile['meal_timing'] ?? 'traditional';
+
+        // First check meal timing preference (if available in moderate or comprehensive assessment)
+        if ($assessmentLevel != 'quick' && isset($profile['meal_timing'])) {
+            if ($mealTiming == 'small_frequent' || $mealTiming == 'frequent') {
+                $mealCount = 6;
+                $mealTypes = "'breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner', 'evening_snack'";
+            } elseif ($mealTiming == 'intermittent' || $mealTiming == 'intermittent_fasting') {
+                $mealCount = 2;
+                $mealTypes = "'lunch', 'dinner'";
+            } elseif ($mealTiming == 'omad' || $mealTiming == 'one_meal') {
+                $mealCount = 1;
+                $mealTypes = "'dinner'";
+            }
+        }
+
+        // Now adjust based on primary goal to optimize meal structure
+        switch ($primaryGoal) {
+            case 'muscle_gain':
+                // For muscle gain, add pre/post workout meals if not already included
+                if ($mealCount <= 3) {
+                    $mealCount = 5;
+                    $mealTypes = "'breakfast', 'lunch', 'pre_workout_snack', 'post_workout_shake', 'dinner'";
+                } elseif ($mealCount > 3) {
+                    // For people already doing more frequent meals, ensure pre/post workout are included
+                    $mealTypes = str_replace("'afternoon_snack'", "'pre_workout_snack', 'post_workout_shake'", $mealTypes);
+                }
+                break;
+
+            case 'weight_loss':
+                // For weight loss, structure is important but fewer, larger meals can increase satiety
+                if ($mealTiming == 'traditional') {
+                    $mealCount = 4;
+                    $mealTypes = "'breakfast', 'lunch', 'afternoon_snack', 'dinner'";
+                }
+                break;
+
+            case 'energy':
+                // For energy goals, frequent small meals help maintain stable blood sugar
+                if ($mealCount < 4) {
+                    $mealCount = 5;
+                    $mealTypes = "'breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner'";
+                }
+                break;
+
+            case 'health':
+                // For general health, 3 balanced meals with optional snacks
+                if ($mealTiming == 'traditional') {
+                    $mealCount = 4;
+                    $mealTypes = "'breakfast', 'lunch', 'afternoon_snack', 'dinner'";
+                }
+                break;
+        }
+
+        return [$mealCount, $mealTypes];
+    }
+
+    /**
+     * Enhanced goal-specific instructions based on primary goal
+     */
+    protected function getEnhancedGoalSpecificInstructions($primaryGoal, $profile, $exerciseRoutine)
+    {
+        $workout = strpos($exerciseRoutine, 'minimal') !== false ? false : true;
+        $instructions = "\n\nBased on the primary goal of '{$primaryGoal}', focus on:";
+
+        switch ($primaryGoal) {
+            case 'muscle_gain':
+                $instructions .= "
+- Higher protein intake across all meals (aim for 30g+ per main meal)
+- Strategic nutrient timing (higher carbs before and after workouts)
+- Balanced amino acid profile through complementary protein sources
+- Include leucine-rich foods in each meal to stimulate muscle protein synthesis
+- Sufficient complex carbohydrates for energy and recovery
+- Healthy fats to support testosterone and overall hormone production
+- Anti-inflammatory ingredients to support recovery and reduce soreness
+- Include a slow-digesting protein source before bed for overnight recovery";
+                break;
+
+            case 'weight_loss':
+                $instructions .= "
+- High volume, low calorie density foods for satiety
+- Higher protein intake (25-30% of calories) to preserve muscle mass
+- Strategic carbohydrate timing (higher earlier in the day)
+- Fiber-rich foods to promote fullness and improve gut health
+- Include metabolism-supporting spices and ingredients
+- Adequate healthy fats to support hormone function
+- Hydrating foods with high water content
+- Thermogenic ingredients like chili, ginger, and green tea";
+                break;
+
+            case 'maintain':
+                $instructions .= "
+- Balanced macronutrient distribution throughout the day
+- Consistent meal timing to support metabolic homeostasis
+- Focus on nutrient density rather than caloric manipulation
+- Include a variety of whole foods from all food groups
+- Adequate protein to maintain muscle mass
+- Balanced carbohydrates for energy maintenance
+- Healthy fats to support hormonal function
+- Micronutrient-rich foods for long-term health maintenance";
+                break;
+
+            case 'energy':
+                $instructions .= "
+- Complex carbohydrates with low glycemic index for sustained energy
+- Strategic protein distribution to maintain alertness
+- Iron-rich foods to support oxygen transport
+- B-vitamin rich ingredients for energy metabolism
+- Magnesium-rich foods to support energy production
+- Balanced meals to prevent blood sugar fluctuations
+- Hydrating ingredients with electrolytes
+- Adaptogenic herbs and spices for sustained energy";
+                break;
+
+            default: // health or other goals
+                $instructions .= "
+- Variety of colorful vegetables and fruits
+- Anti-inflammatory foods and spices
+- Heart-healthy fats and oils
+- Balanced macronutrients
+- Foods known to support immune function
+- Fiber-rich whole grains and legumes
+- Antioxidant-rich ingredients
+- Probiotic and prebiotic foods for gut health";
+                break;
+        }
+
+        // Add workout-specific instructions if applicable
+        if ($workout && ($primaryGoal == 'muscle_gain' || $primaryGoal == 'weight_loss')) {
+            $instructions .= "\n- Pre-workout nutrition: " . ($primaryGoal == 'muscle_gain' ? "Easily digestible carbs and moderate protein 1-2 hours before exercise" : "Light, easily digestible meal with focus on complex carbs 1-2 hours before exercise");
+            $instructions .= "\n- Post-workout nutrition: " . ($primaryGoal == 'muscle_gain' ? "Fast-absorbing protein and carbs within 30-45 minutes after exercise" : "Balanced protein and moderate carbs within 45 minutes after exercise");
+        }
+
+        return $instructions;
+    }
+
+    /**
+     * Add dietitian best practices tailored to goals and conditions
+     */
+    protected function getDietitianBestPractices($primaryGoal, $season, $weather)
+    {
+        $isWarm = strpos(strtolower($weather), 'warm') !== false || strpos(strtolower($weather), 'hot') !== false;
+
+        $practices = "\n\nDietitian Best Practices to Include:";
+
+        // Common best practices for all goals
+        $practices .= "
+- Meal timing optimized for the person's daily schedule and primary goal
+- Proper hydration reminders throughout the day";
+
+        // Add hydration recommendations based on weather
+        if ($isWarm) {
+            $practices .= " (minimum 3-4 liters)";
+        } else {
+            $practices .= " (minimum 2-3 liters)";
+        }
+
+        // Common practices continued
+        $practices .= "
+- Anti-inflammatory spices like turmeric, ginger and cumin
+- Proper food pairing for maximum nutrient absorption (like vitamin C with plant iron sources)
+- Balance of raw and cooked vegetables for optimal digestion
+- Focus on fiber-rich whole foods for gut health (minimum 25g fiber per day)
+- Include probiotic foods (like yogurt/curd) for digestive health";
+
+        // Weather-specific practices
+        if ($isWarm) {
+            $practices .= "
+- Cooling foods and spices appropriate for warm weather
+- Strategic sodium and electrolyte levels for hydration in warm climate
+- Lighter cooking methods to avoid heating the body";
+        } else {
+            $practices .= "
+- Warming spices and foods appropriate for cooler weather
+- Cooked foods to support digestion in cooler temperatures
+- Hearty meals that provide sustained warmth and energy";
+        }
+
+        // Goal-specific practices
+        switch ($primaryGoal) {
+            case 'muscle_gain':
+                $practices .= "
+- Strategic protein distribution every 3-4 hours to maximize muscle protein synthesis
+- Leucine threshold of minimum 2.5g per meal to trigger anabolism
+- Post-workout window nutrition optimization
+- Carbohydrate cycling based on workout intensity";
+                break;
+
+            case 'weight_loss':
+                $practices .= "
+- Caloric deficit structured for sustainable fat loss without muscle loss
+- Volume eating strategies for satiety with lower calories
+- Strategic meal timing to manage hunger hormones
+- Protein-forward meals to preserve lean mass during deficit";
+                break;
+
+            case 'energy':
+                $practices .= "
+- Blood sugar management through balanced macronutrients
+- Iron status optimization through diet
+- B-vitamin rich foods to support energy metabolism
+- Small, frequent meals to maintain energy levels";
+                break;
+        }
+
+        return $practices;
+    }
+
+    /**
+     * Estimate current season based on location
+     */
+    protected function estimateCurrentSeason($country)
+    {
+        $month = date('n'); // Current month (1-12)
+
+        // Default to northern hemisphere seasons
+        if ($month >= 3 && $month <= 5) {
+            $season = 'Spring';
+        } elseif ($month >= 6 && $month <= 8) {
+            $season = 'Summer';
+        } elseif ($month >= 9 && $month <= 11) {
+            $season = 'Fall';
+        } else {
+            $season = 'Winter';
+        }
+
+        // Southern hemisphere countries have opposite seasons
+        $southernHemisphereCountries = ['australia', 'new zealand', 'argentina', 'chile', 'south africa', 'brazil', 'uruguay', 'paraguay', 'bolivia'];
+
+        if (in_array(strtolower($country), $southernHemisphereCountries)) {
+            switch ($season) {
+                case 'Spring':
+                    $season = 'Fall';
+                    break;
+                case 'Summer':
+                    $season = 'Winter';
+                    break;
+                case 'Fall':
+                    $season = 'Spring';
+                    break;
+                case 'Winter':
+                    $season = 'Summer';
+                    break;
+            }
+        }
+
+        // India has different seasons
+        if (strtolower($country) == 'india') {
+            if ($month >= 3 && $month <= 5) {
+                $season = 'Summer';
+            } elseif ($month >= 6 && $month <= 9) {
+                $season = 'Monsoon';
+            } elseif ($month >= 10 && $month <= 11) {
+                $season = 'Post-Monsoon';
+            } else {
+                $season = 'Winter';
+            }
+        }
+
+        return $season;
+    }
+
+    /**
+     * Estimate current weather based on location and season
+     */
+    protected function estimateCurrentWeather($country, $city)
+    {
+        $season = $this->estimateCurrentSeason($country);
+        $month = date('n');
+
+        // Default weather patterns based on season
+        $weatherMap = [
+            'Spring' => 'Mild and variable',
+            'Summer' => 'Warm and humid',
+            'Fall' => 'Cool and breezy',
+            'Winter' => 'Cold and dry',
+            'Monsoon' => 'Warm and rainy',
+            'Post-Monsoon' => 'Warm and gradually cooling'
+        ];
+
+        // Try to provide more specific weather for India
+        if (strtolower($country) == 'india') {
+            if (in_array(strtolower($city), ['delhi', 'jaipur', 'agra', 'chandigarh', 'lucknow'])) {
+                $northIndia = [
+                    'Winter' => 'Cold and dry',
+                    'Summer' => 'Hot and dry',
+                    'Monsoon' => 'Warm and humid',
+                    'Post-Monsoon' => 'Pleasant and cooling'
+                ];
+                return $northIndia[$season] ?? $weatherMap[$season];
+            } elseif (in_array(strtolower($city), ['mumbai', 'goa', 'pune', 'ahmedabad', 'indore'])) {
+                $westIndia = [
+                    'Winter' => 'Mild and dry',
+                    'Summer' => 'Hot and dry',
+                    'Monsoon' => 'Warm and very rainy',
+                    'Post-Monsoon' => 'Warm and gradually cooling'
+                ];
+                return $westIndia[$season] ?? $weatherMap[$season];
+            } elseif (in_array(strtolower($city), ['chennai', 'bangalore', 'hyderabad', 'kochi', 'mysore'])) {
+                $southIndia = [
+                    'Winter' => 'Pleasant and mild',
+                    'Summer' => 'Hot and humid',
+                    'Monsoon' => 'Warm and rainy',
+                    'Post-Monsoon' => 'Warm and pleasant'
+                ];
+                return $southIndia[$season] ?? $weatherMap[$season];
+            } elseif (in_array(strtolower($city), ['kolkata', 'bhubaneswar', 'patna', 'guwahati', 'siliguri'])) {
+                $eastIndia = [
+                    'Winter' => 'Cool and dry',
+                    'Summer' => 'Hot and humid',
+                    'Monsoon' => 'Warm and very rainy',
+                    'Post-Monsoon' => 'Warm and humid'
+                ];
+                return $eastIndia[$season] ?? $weatherMap[$season];
+            }
+        }
+
+        return $weatherMap[$season] ?? 'Moderate';
     }
 
 

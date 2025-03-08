@@ -10,7 +10,6 @@ use App\Models\DietPlan;
 use App\Models\Meal;
 use App\Models\MealPlan;
 use App\Models\User;
-use App\Jobs\GenerateMealPlanForDay;
 use Illuminate\Support\Facades\Log;
 
 abstract class BaseAIService implements AIServiceInterface
@@ -25,153 +24,159 @@ abstract class BaseAIService implements AIServiceInterface
     /**
      * Generate diet plan based on assessment responses
      */
-    public function generateDietPlan(AssessmentSession $session): ?DietPlan
+    public function generateDietPlan(AssessmentSession $session): DietPlan
     {
         Log::info('Starting diet plan generation', ['assessment_id' => $session->id]);
 
-        // Retrieve user and responses
-        $user = User::find($session->user_id);
-        if (!$user) {
-            Log::error('User not found for diet plan generation', ['assessment_id' => $session->id]);
-            return null;
-        }
-
-        $responses = $session->responses ?? [];
-        if (empty($responses)) {
-            Log::warning('No assessment responses found, skipping diet plan generation', ['user_id' => $user->id]);
-            return null;
-        }
+        $user = User::findOrFail($session->user_id);
+        $responses = $session->responses;
 
         // Get or create client profile
         $profile = $this->createClientProfileFromResponses($user, $responses);
-        if (!$profile) {
-            Log::error('Failed to create or retrieve client profile', ['user_id' => $user->id]);
-            return null;
-        }
         Log::info('Client profile created/updated', ['profile_id' => $profile->id]);
 
         // Generate diet plan
         $dietPlan = $this->createBaseDietPlan($user, $profile, $responses);
-        if (!$dietPlan) {
-            Log::error('Diet plan generation failed', ['user_id' => $user->id]);
-            return null;
-        }
         Log::info('Base diet plan created', ['diet_plan_id' => $dietPlan->id]);
 
-        // **FIX: Create a Meal Plan if it doesn't exist**
-        $mealPlan = MealPlan::firstOrCreate(
-            ['diet_plan_id' => $dietPlan->id],
-            [
-                'client_id' => $user->id,
-                'status' => 'pending',
-            ]
-        );
-
-        if (!$mealPlan) {
-            Log::error('Meal plan creation failed', ['diet_plan_id' => $dietPlan->id]);
-            return null;
-        }
-
-        Log::info('Meal plan created or found', ['meal_plan_id' => $mealPlan->id]);
-
-        // Prepare preferences for the meal plan job
-        $preferences = [
+        // Generate meal plans using provider-specific implementation
+        $this->generateMealPlans($dietPlan, $responses, [
             'profile' => $profile,
             'health_conditions' => $profile->health_conditions ?? ['none'],
             'allergies' => $profile->allergies ?? ['none'],
             'recovery_needs' => $profile->recovery_needs ?? ['none'],
             'meal_preferences' => $profile->meal_preferences ?? ['balanced'],
             'cuisine_preferences' => $profile->cuisine_preferences ?? ['no_preference'],
-        ];
-
-        // Queue meal plan generation job safely
-        try {
-            GenerateMealPlanForDay::dispatch(
-                $mealPlan->id,
-                $dietPlan->id,
-                $profile->id,
-                $responses,
-                $preferences,
-                'Monday'
-            )->delay(now()->addSeconds(5));
-
-            Log::info('Meal plan queued for background processing', [
-                'diet_plan_id' => $dietPlan->id,
-                'meal_plan_id' => $mealPlan->id
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to dispatch GenerateMealPlanForDay job', [
-                'diet_plan_id' => $dietPlan->id,
-                'error' => $e->getMessage()
-            ]);
-        }
+            'daily_schedule' => $profile->daily_schedule ?? 'standard',
+            'cooking_capability' => $profile->cooking_capability ?? 'basic',
+            'exercise_routine' => $profile->exercise_routine ?? 'minimal',
+            'stress_sleep' => $profile->stress_sleep ?? 'moderate',
+        ]);
+        Log::info('Meal plans generated', ['diet_plan_id' => $dietPlan->id]);
 
         return $dietPlan;
     }
+
     /**
-     * 
      * Create client profile from assessment responses
      */
     protected function createClientProfileFromResponses(User $user, array $responses)
     {
-        // Retrieve existing profile or create a new one
         $profile = ClientProfile::firstOrNew(['user_id' => $user->id]);
 
-        // 🔹 Basic Information
-        $profile->age = $responses['age'] ?? $profile->age;
-        $profile->gender = isset($responses['gender']) ? strtolower($responses['gender']) : $profile->gender;
-        $profile->height = isset($responses['height']) ? $this->convertToMetric($responses['height'], 'height') : $profile->height;
-        $profile->current_weight = isset($responses['current_weight']) ? $this->convertToMetric($responses['current_weight'], 'weight') : $profile->current_weight;
-        $profile->target_weight = isset($responses['target_weight']) ? $this->convertToMetric($responses['target_weight'], 'weight') : $profile->target_weight;
+        // Basic Information (Phase 1)
+        if (isset($responses['age'])) {
+            $profile->age = $responses['age'];
+        }
 
-        // 🔹 Location Data
-        $profile->country = $responses['country'] ?? $profile->country;
-        $profile->state = $responses['state'] ?? $profile->state;
-        $profile->city = $responses['city'] ?? $profile->city;
+        if (isset($responses['gender'])) {
+            $profile->gender = strtolower($responses['gender']);
+        }
 
-        // 🔹 Activity & Health
-        $profile->activity_level = isset($responses['activity_level']) ? $this->mapActivityLevel($responses['activity_level']) : $profile->activity_level;
-        $profile->health_conditions = isset($responses['health_conditions']) ? $this->formatListResponse($responses['health_conditions']) : $profile->health_conditions;
-        $profile->health_details = $responses['health_details'] ?? $profile->health_details;
+        if (isset($responses['height'])) {
+            $profile->height = $this->convertToMetric($responses['height'], 'height');
+        }
 
-        // 🔹 Medications & Allergies
-        $profile->medications = isset($responses['medications']) ? $this->formatListResponse($responses['medications']) : $profile->medications;
-        $profile->medication_details = $responses['medication_details'] ?? $profile->medication_details;
-        $profile->allergies = isset($responses['allergies']) ? $this->formatListResponse($responses['allergies']) : $profile->allergies;
+        if (isset($responses['current_weight'])) {
+            $profile->current_weight = $this->convertToMetric($responses['current_weight'], 'weight');
+        }
 
-        // 🔹 Recovery Needs
-        $profile->recovery_needs = isset($responses['recovery_needs']) ? $this->formatListResponse($responses['recovery_needs']) : $profile->recovery_needs;
-        $profile->organ_recovery_details = $responses['organ_recovery'] ?? $profile->organ_recovery_details;
+        if (isset($responses['target_weight'])) {
+            $profile->target_weight = $this->convertToMetric($responses['target_weight'], 'weight');
+        }
 
-        // 🔹 Diet Preferences
-        $profile->diet_type = isset($responses['diet_type']) ? $this->mapDietType($responses['diet_type']) : $profile->diet_type;
-        $profile->cuisine_preferences = isset($responses['cuisine_preferences']) ? $this->formatListResponse($responses['cuisine_preferences']) : $profile->cuisine_preferences;
-        $profile->meal_timing = isset($responses['meal_timing']) ? $this->mapMealTiming(timing: $responses['meal_timing']) : $profile->meal_timing;
-        $profile->food_restrictions = isset($responses['food_restrictions']) ? $this->formatListResponse($responses['food_restrictions']) : $profile->food_restrictions;
+        if (isset($responses['activity_level'])) {
+            $profile->activity_level = $this->mapActivityLevel($responses['activity_level']);
+        }
 
-        // 🔹 Meal Variety & Preferences
-        $profile->meal_variety = isset($responses['meal_variety']) ? $this->mapMealVariety($responses['meal_variety']) : $profile->meal_variety;
+        // Health Assessment (Phase 2)
+        if (isset($responses['health_conditions'])) {
+            $healthConditions = $this->formatListResponse($responses['health_conditions']);
+            $profile->health_conditions = $healthConditions;
 
-        // 🔹 Lifestyle & Daily Routine
-        $profile->daily_schedule = isset($responses['daily_schedule']) ? $this->mapDailySchedule($responses['daily_schedule']) : $profile->daily_schedule;
-        $profile->cooking_capability = isset($responses['cooking_capability']) ? $this->mapCookingCapability($responses['cooking_capability']) : $profile->cooking_capability;
-        $profile->exercise_routine = isset($responses['exercise_routine']) ? $this->mapExerciseRoutine($responses['exercise_routine']) : $profile->exercise_routine;
-        $profile->stress_sleep = isset($responses['stress_sleep']) ? $this->mapStressSleep($responses['stress_sleep']) : $profile->stress_sleep;
+            // Add health condition details if available
+            if (isset($responses['health_details'])) {
+                $profile->health_details = $responses['health_details'];
+            }
+        }
 
-        // 🔹 Goal Tracking & Commitment
-        $profile->primary_goal = isset($responses['primary_goal']) ? $this->mapPrimaryGoal($responses['primary_goal']) : $profile->primary_goal;
-        $profile->goal_timeline = isset($responses['timeline']) ? $this->mapTimeline($responses['timeline']) : $profile->goal_timeline;
-        $profile->commitment_level = isset($responses['commitment_level']) ? $this->mapCommitmentLevel($responses['commitment_level']) : $profile->commitment_level;
-        $profile->measurement_preference = isset($responses['measurement_preference']) ? $this->mapMeasurementPreference($responses['measurement_preference']) : $profile->measurement_preference;
+        if (isset($responses['allergies'])) {
+            $profile->allergies = $this->formatListResponse($responses['allergies']);
+        }
 
-        // 🔹 Additional Customization
-        $profile->additional_requests = $responses['additional_requests'] ?? $profile->additional_requests;
-        $profile->plan_type = $responses['plan_type'] ?? $profile->plan_type;
+        if (isset($responses['recovery_needs'])) {
+            $profile->recovery_needs = $this->formatListResponse($responses['recovery_needs']);
 
-        $profile->body_type = $responses['body_type'] ?? $profile->body_type;
-        $profile->water_intake = $responses['water_intake'] ?? $profile->water_intake;
+            // Add organ recovery details if available
+            if (isset($responses['organ_recovery'])) {
+                $profile->organ_recovery_details = $responses['organ_recovery'];
+            }
+        }
 
-        // 🔹 Save Profile
+        // Diet Preferences (Phase 3)
+        if (isset($responses['diet_type'])) {
+            $profile->diet_type = $this->mapDietType($responses['diet_type']);
+        }
+
+        if (isset($responses['cuisine_preferences'])) {
+            $profile->cuisine_preferences = $this->formatListResponse($responses['cuisine_preferences']);
+        }
+
+        if (isset($responses['meal_timing'])) {
+            $profile->meal_timing = $this->mapMealTiming($responses['meal_timing']);
+        }
+
+        if (isset($responses['food_restrictions'])) {
+            $profile->food_restrictions = $this->formatListResponse($responses['food_restrictions']);
+        }
+
+        // Lifestyle (Phase 4)
+        if (isset($responses['daily_schedule'])) {
+            $profile->daily_schedule = $this->mapDailySchedule($responses['daily_schedule']);
+        }
+
+        if (isset($responses['cooking_capability'])) {
+            $profile->cooking_capability = $this->mapCookingCapability($responses['cooking_capability']);
+        }
+
+        if (isset($responses['exercise_routine'])) {
+            $profile->exercise_routine = $this->mapExerciseRoutine($responses['exercise_routine']);
+        }
+
+        if (isset($responses['stress_sleep'])) {
+            $profile->stress_sleep = $this->mapStressSleep($responses['stress_sleep']);
+        }
+
+        // Goals (Phase 5)
+        if (isset($responses['primary_goal'])) {
+            $profile->primary_goal = $this->mapPrimaryGoal($responses['primary_goal']);
+        }
+
+        if (isset($responses['timeline'])) {
+            $profile->goal_timeline = $this->mapTimeline($responses['timeline']);
+        }
+
+        if (isset($responses['measurement_preference'])) {
+            $profile->measurement_preference = $this->mapMeasurementPreference($responses['measurement_preference']);
+        }
+
+        // Plan Customization (Phase 6)
+        if (isset($responses['plan_type'])) {
+            $profile->plan_type = $responses['plan_type'];
+        }
+
+        if (isset($responses['country'])) {
+            $profile->country = $responses['country'];
+        }
+
+        if (isset($responses['state'])) {
+            $profile->state = $responses['state'];
+        }
+
+        if (isset($responses['city'])) {
+            $profile->city = $responses['city'];
+        }
+
         $profile->save();
         return $profile;
     }
@@ -286,7 +291,6 @@ abstract class BaseAIService implements AIServiceInterface
 
         $dietPlan->save();
 
-        Log::info('diet plan id generated', (array) $dietPlan);
         return $dietPlan;
     }
 
@@ -295,26 +299,6 @@ abstract class BaseAIService implements AIServiceInterface
      * (abstract, implemented by specific providers)
      */
     abstract public function generateMealPlans(DietPlan $dietPlan, array $responses, array $preferences): bool;
-
-    public function generateMealsForDay(MealPlan $mealPlan, DietPlan $dietPlan, ClientProfile $profile, array $responses, array $preferences, string $dayOfWeek)
-    {
-        Log::info("Generating meals for {$dayOfWeek}", ['meal_plan_id' => $mealPlan->id, 'diet_plan_id' => $dietPlan->id]);
-
-        try {
-            return $this->generateMealPlans($dietPlan, $responses, array_merge($preferences, [
-                'day' => $dayOfWeek,
-                'meal_plan_id' => $mealPlan->id,
-            ]));
-        } catch (\Exception $e) {
-            Log::error("Error generating meals for {$dayOfWeek}", ['error' => $e->getMessage(), 'meal_plan_id' => $mealPlan->id]);
-
-            $this->createDefaultMeals($mealPlan->id, $dietPlan);
-            $mealPlan->generation_status = 'failed';
-            $mealPlan->save();
-
-            return false;
-        }
-    }
 
     /**
      * Create default meals for a meal plan
@@ -344,6 +328,8 @@ abstract class BaseAIService implements AIServiceInterface
                     ]
                 ]
             ],
+            // Other meals remain the same
+            // ...
         ];
 
         foreach ($defaultMeals as $mealData) {
@@ -393,33 +379,18 @@ abstract class BaseAIService implements AIServiceInterface
         return round($bmr * $multiplier);
     }
 
-    private function calculateMacros($calories, $dietType, $responses)
+    protected function calculateMacros($calories, $dietType, $responses)
     {
-        $goalType = $responses['primary_goal'] ?? 'weight_loss';
+        // Get primary goal from responses for more accurate macro calculation
+        $primaryGoal = $responses['primary_goal'] ?? 'health';
+        $goalType = $this->mapPrimaryGoal($primaryGoal);
 
-        // Default macro distribution
         $macros = [
             'protein' => 0,
             'carbs' => 0,
             'fats' => 0,
         ];
 
-        // Handle special diet types first
-        if ($dietType === 'keto') {
-            return [
-                'protein' => round(($calories * 0.25) / 4), // 25% protein
-                'carbs' => round(($calories * 0.05) / 4),   // 5% carbs
-                'fats' => round(($calories * 0.7) / 9),     // 70% fats
-            ];
-        } elseif ($dietType === 'high_protein') {
-            return [
-                'protein' => round(($calories * 0.4) / 4),  // 40% protein
-                'carbs' => round(($calories * 0.3) / 4),    // 30% carbs
-                'fats' => round(($calories * 0.3) / 9),     // 30% fats
-            ];
-        }
-
-        // Goal-based macros
         switch ($goalType) {
             case 'weight_loss':
                 $macros['protein'] = round(($calories * 0.3) / 4); // 30% protein
@@ -433,16 +404,36 @@ abstract class BaseAIService implements AIServiceInterface
                 $macros['fats'] = round(($calories * 0.2) / 9);    // 20% fats
                 break;
 
-            case 'maintenance':
+            case 'energy':
+                $macros['protein'] = round(($calories * 0.2) / 4);  // 20% protein
+                $macros['carbs'] = round(($calories * 0.55) / 4);   // 55% carbs
+                $macros['fats'] = round(($calories * 0.25) / 9);    // 25% fats
+                break;
+
+            case 'athletic':
+                $macros['protein'] = round(($calories * 0.3) / 4);  // 30% protein
+                $macros['carbs'] = round(($calories * 0.5) / 4);    // 50% carbs
+                $macros['fats'] = round(($calories * 0.2) / 9);     // 20% fats
+                break;
+
+            case 'health':
+            case 'recovery':
+            case 'longevity':
+            default:
                 $macros['protein'] = round(($calories * 0.25) / 4); // 25% protein
                 $macros['carbs'] = round(($calories * 0.5) / 4);   // 50% carbs
                 $macros['fats'] = round(($calories * 0.25) / 9);   // 25% fats
-                break;
+        }
 
-            default:
-                $macros['protein'] = round(($calories * 0.3) / 4); // 30% protein
-                $macros['carbs'] = round(($calories * 0.4) / 4);   // 40% carbs
-                $macros['fats'] = round(($calories * 0.3) / 9);    // 30% fats
+        // Adjust for diet type
+        if ($dietType === 'keto') {
+            $macros['protein'] = round(($calories * 0.25) / 4); // 25% protein
+            $macros['carbs'] = round(($calories * 0.05) / 4);   // 5% carbs
+            $macros['fats'] = round(($calories * 0.7) / 9);     // 70% fats
+        } elseif ($dietType === 'high_protein') {
+            $macros['protein'] = round(($calories * 0.4) / 4);  // 40% protein
+            $macros['carbs'] = round(($calories * 0.3) / 4);    // 30% carbs
+            $macros['fats'] = round(($calories * 0.3) / 9);     // 30% fats
         }
 
         return $macros;
@@ -699,31 +690,6 @@ abstract class BaseAIService implements AIServiceInterface
         ];
 
         return $map[$preference] ?? 'combination';
-    }
-
-    protected function mapMealVariety($value)
-    {
-        $map = [
-            '1' => 'high_variety',
-            '2' => 'moderate_var',
-            '3' => 'limited_var',
-            '4' => 'repetitive'
-        ];
-
-        return $map[$value] ?? 'moderate_var';
-    }
-
-    protected function mapCommitmentLevel($value)
-    {
-        $map = [
-            '1' => 'very_committed',
-            '2' => 'mostly',
-            '3' => 'moderate',
-            '4' => 'flexible',
-            '5' => 'gradual'
-        ];
-
-        return $map[$value] ?? 'moderate';
     }
 
     /**
