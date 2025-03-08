@@ -261,7 +261,7 @@ Format your response as a valid JSON array of meal objects.";
     /**
      * Generate meals for a specific day
      */
-    protected function generateMealsForDay($mealPlan, $dietPlan, $profile, $responses, $preferences, $day)
+    public function generateMealsForDay($mealPlan, $dietPlan, $profile, $responses, $preferences, $day)
     {
         // Format the prompt
         $prompt = $this->formatMealPrompt($dietPlan, $profile, $preferences, $day);

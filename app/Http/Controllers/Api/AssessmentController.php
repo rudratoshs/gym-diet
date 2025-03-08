@@ -170,12 +170,12 @@ class AssessmentController extends Controller
      */
     public function complete(Request $request, AssessmentSession $assessment)
     {
-        // Check permission
+        // 🔹 Check permission
         if (!$request->user()->can('view_clients') && $request->user()->id !== $assessment->user_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Check if assessment is in progress
+        // 🔹 Validate if assessment is in progress
         if ($assessment->status !== 'in_progress') {
             return response()->json([
                 'message' => 'Assessment is already completed or abandoned',
@@ -183,38 +183,45 @@ class AssessmentController extends Controller
             ], 400);
         }
 
-        // Validate any final inputs (optional)
+        // 🔹 Validate final responses (optional)
         $finalData = $request->validate([
             'final_responses' => 'sometimes|array',
         ]);
 
-        // Merge final responses if provided
+        // 🔹 Merge final responses if provided
         if (isset($finalData['final_responses'])) {
             $responses = $assessment->responses ?? [];
             $assessment->responses = array_merge($responses, $finalData['final_responses']);
         }
 
-        // Mark as completed
+        // 🔹 Mark assessment as completed
         $assessment->status = 'completed';
         $assessment->completed_at = now();
         $assessment->save();
 
-        // Log assessment completion
+        // 🔹 Log assessment completion
         Log::info('Assessment completed', [
             'user_id' => $assessment->user_id,
             'assessment_id' => $assessment->id,
             'response_count' => count($assessment->responses ?? []),
         ]);
 
-        // Get the user from the assessment
-        $user = User::findOrFail($assessment->user_id);
+        // 🔹 Fetch the user
+        $user = User::find($assessment->user_id);
+        if (!$user) {
+            Log::error('User not found, skipping diet plan generation', ['assessment_id' => $assessment->id]);
+            return response()->json([
+                'message' => 'Assessment completed, but user data is missing.',
+                'assessment' => new AssessmentSessionResource($assessment)
+            ], 400);
+        }
 
-        // Get the user's gym and create the appropriate AI service
+        // 🔹 Fetch AI Service (now optional for better handling)
         $gym = $user->gyms()->first();
         $aiService = AIServiceFactory::create($gym);
 
         try {
-            // Generate diet plan with more detailed logging
+            // 🔹 Generate diet plan
             Log::info('Generating diet plan', [
                 'user_id' => $user->id,
                 'assessment_id' => $assessment->id,
@@ -222,6 +229,14 @@ class AssessmentController extends Controller
             ]);
 
             $dietPlan = $aiService->generateDietPlan($assessment);
+
+            if (!$dietPlan) {
+                Log::error('Diet plan generation failed due to missing data', ['user_id' => $user->id]);
+                return response()->json([
+                    'message' => 'Assessment completed, but diet plan generation failed.',
+                    'assessment' => new AssessmentSessionResource($assessment)
+                ], 500);
+            }
 
             Log::info('Diet plan generated successfully', [
                 'user_id' => $user->id,
@@ -254,12 +269,12 @@ class AssessmentController extends Controller
      */
     public function result(Request $request, AssessmentSession $assessment)
     {
-        // Check permission
+        // 🔹 Check permission
         if (!$request->user()->can('view_clients') && $request->user()->id !== $assessment->user_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Check if assessment is completed
+        // 🔹 Ensure assessment is completed
         if ($assessment->status !== 'completed') {
             return response()->json([
                 'message' => 'Assessment is not completed',
@@ -267,22 +282,58 @@ class AssessmentController extends Controller
             ], 400);
         }
 
-        // Get latest diet plan generated from this assessment
+        // 🔹 Fetch the latest diet plan (more flexible time check)
         $dietPlan = $assessment->user->dietPlans()
-            ->where('created_at', '>=', $assessment->completed_at)
-            ->latest()
+            ->whereDate('created_at', '>=', $assessment->completed_at)
+            ->orderBy('created_at', 'desc')
             ->first();
 
+        // 🔹 If no diet plan found, attempt on-demand generation
         if (!$dietPlan) {
-            // If no diet plan found, try to generate one now
-            try {
-                $user = User::findOrFail($assessment->user_id);
-                $gym = $user->gyms()->first();
-                $aiService = AIServiceFactory::create($gym);
+            Log::warning('No diet plan found, attempting AI generation', ['assessment_id' => $assessment->id]);
 
+            try {
+                // 🔹 Validate user existence
+                $user = User::find($assessment->user_id);
+                if (!$user) {
+                    Log::error('User not found, skipping on-demand generation', ['assessment_id' => $assessment->id]);
+                    return response()->json([
+                        'message' => 'User data missing, diet plan cannot be generated.',
+                        'assessment' => new AssessmentSessionResource($assessment)
+                    ], 400);
+                }
+
+                // 🔹 Validate AI Service
+                $gym = $user->gyms()->first();
+                if (!$gym) {
+                    Log::error('No gym found for user, cannot create AI service', ['user_id' => $user->id]);
+                    return response()->json([
+                        'message' => 'AI service unavailable for this user.',
+                        'assessment' => new AssessmentSessionResource($assessment)
+                    ], 500);
+                }
+
+                $aiService = AIServiceFactory::create($gym);
+                if (!$aiService) {
+                    Log::error('AI service creation failed', ['user_id' => $user->id]);
+                    return response()->json([
+                        'message' => 'Failed to initialize AI service.',
+                        'assessment' => new AssessmentSessionResource($assessment)
+                    ], 500);
+                }
+
+                // 🔹 Generate diet plan safely
                 $dietPlan = $aiService->generateDietPlan($assessment);
 
-                Log::info('Diet plan generated on demand', [
+                if (!$dietPlan) {
+                    Log::error('Diet plan generation failed on demand', ['user_id' => $user->id]);
+                    return response()->json([
+                        'message' => 'Failed to generate diet plan for this assessment.',
+                        'assessment' => new AssessmentSessionResource($assessment)
+                    ], 500);
+                }
+
+                Log::info('Diet plan successfully generated on demand', [
                     'user_id' => $user->id,
                     'diet_plan_id' => $dietPlan->id,
                 ]);
@@ -294,14 +345,14 @@ class AssessmentController extends Controller
                 ]);
 
                 return response()->json([
-                    'message' => 'Could not generate diet plan for this assessment',
+                    'message' => 'Could not generate diet plan for this assessment.',
                     'error' => $e->getMessage(),
                     'assessment' => new AssessmentSessionResource($assessment)
                 ], 500);
             }
         }
 
-        // Load diet plan with meal plans and meals
+        // 🔹 Ensure diet plan has meal plans
         $dietPlan->load(['mealPlans.meals']);
 
         return response()->json([

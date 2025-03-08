@@ -9,7 +9,7 @@ use App\Models\DietPlan;
 use App\Models\MealPlan;
 use App\Models\User;
 use App\Models\Gym;
-use App\Services\AIService;
+use App\Services\AI\BaseAIService;
 use App\Services\SubscriptionFeatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -27,9 +27,9 @@ class MealPlanController extends Controller
      * @param  \App\Services\SubscriptionFeatureService  $subscriptionFeatureService
      * @return void
      */
-    public function __construct(AIService $aiService = null, SubscriptionFeatureService $subscriptionFeatureService = null)
+    public function __construct(BaseAIService $aiService = null, SubscriptionFeatureService $subscriptionFeatureService = null)
     {
-        $this->aiService = $aiService ?? app(AIService::class);
+        $this->aiService = $aiService ?? app(BaseAIService::class);
         $this->subscriptionFeatureService = $subscriptionFeatureService ?? app(SubscriptionFeatureService::class);
     }
 
@@ -178,11 +178,18 @@ class MealPlanController extends Controller
             }
 
             // This would typically be a job that runs in the background
-            $this->aiService->generateMeals(
+            $this->aiService->generateMealsForDay(
                 $mealPlan,
                 $dietPlan,
                 $clientProfile,
                 $responses,
+                [
+                    'profile' => $clientProfile,
+                    'health_conditions' => $clientProfile->health_conditions ?? ['none'],
+                    'allergies' => $clientProfile->allergies ?? ['none'],
+                    'meal_preferences' => $clientProfile->meal_preferences ?? ['balanced'],
+                    'cuisine_preferences' => $clientProfile->cuisine_preferences ?? ['no_preference'],
+                ],
                 $mealPlan->day_of_week
             );
 

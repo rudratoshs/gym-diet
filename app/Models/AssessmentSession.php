@@ -15,9 +15,11 @@ class AssessmentSession extends Model
         'current_phase',
         'current_question',
         'responses',
+        'pagination',
         'status',
         'started_at',
         'completed_at',
+        'assessment_type',
     ];
 
     protected $casts = [

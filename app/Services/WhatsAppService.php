@@ -37,12 +37,6 @@ class WhatsAppService
         $this->groceryListService = $groceryListService;
         $this->nutritionInfoService = $nutritionInfoService;
         $this->progressTrackingService = $progressTrackingService;
-
-        // Load assessment flow from configuration
-        $this->loadAssessmentFlow();
-
-        // Initialize conditional checks
-        $this->conditionalChecks = \App\Config\DietAssessmentFlow::getConditionalChecks();
     }
 
     /**
@@ -50,6 +44,7 @@ class WhatsAppService
      */
     private function loadAssessmentFlow($level = 'moderate')
     {
+        Log::info('leve of assement'. $level);
         // Get user language preference (from database or session)
         $userLang = 'en'; // Default to English
 
@@ -270,6 +265,7 @@ class WhatsAppService
         $responses['assessment_type'] = $assessmentType;
         $session->responses = $responses;
 
+        Log::info('assessmentType-step'.$assessmentType);
         // Load the appropriate question set
         $this->loadAssessmentFlow($assessmentType);
 
@@ -279,13 +275,13 @@ class WhatsAppService
         $session->save();
 
         // Send welcome message
-        $this->sendTextMessage($user->whatsapp_phone, "Great! I'll now ask you a series of questions to create your personalized diet plan. Let's get started!");
-
+        $this->sendTextMessage($user->whatsapp_phone, "Great! You selected *{$assessmentType}* assessment. Let's start with the first question.");
         // Ask first question
         $this->askQuestion($user, 'age');
 
         return $session;
     }
+
 
     /**
      * Ask a specific question based on its ID
@@ -382,7 +378,7 @@ class WhatsAppService
                     'total_pages' => ceil($totalOptions / 8)
                 ];
                 $session->responses = $responses;
-                Log::info('session before save in function askQuestion  for LIST',(array)$responses);
+                Log::info('session before save in function askQuestion  for LIST', (array) $responses);
                 $session->save();
 
                 // Create rows for the list
@@ -446,224 +442,110 @@ class WhatsAppService
      */
     private function continueAssessment(User $user, AssessmentSession $session, string $response, string $displayText = null)
     {
-        // Special handling for assessment type selection (Phase 0)
         if ($session->current_phase === 0 && $session->current_question === 'assessment_type') {
             return $this->handleAssessmentTypeSelection($user, $session, $response);
         }
 
+        $this->loadAssessmentFlow($session->assessment_type);
+        Log::info('current seesion',array($session));
+
         $currentQuestion = $session->current_question;
         $responses = $session->responses ?? [];
 
-        // Check for pagination in responses
         $paginationKey = '_pagination_' . $currentQuestion;
         $pagination = $responses[$paginationKey] ?? null;
 
-        // Handle pagination navigation if present
-        if ($pagination && $response === 'next_page') {
-            $page = $pagination['page'] + 1;
-            $responses[$paginationKey]['page'] = $page;
-            $session->responses = $responses;
-            $session->save();
-            $this->askQuestion($user, $currentQuestion);
-            return $session;
-        } elseif ($pagination && $response === 'prev_page') {
-            $page = $pagination['page'] - 1;
-            if ($page < 0)
-                $page = 0;
-            $responses[$paginationKey]['page'] = $page;
+        if ($pagination) {
+            if ($response === 'next_page') {
+                $responses[$paginationKey]['page']++;
+            } elseif ($response === 'prev_page') {
+                $responses[$paginationKey]['page'] = max(0, $pagination['page'] - 1);
+            }
+
             $session->responses = $responses;
             $session->save();
             $this->askQuestion($user, $currentQuestion);
             return $session;
         }
 
-        // Handle restart request
         if ($response === 'restart') {
             $session->status = 'abandoned';
             $session->save();
-
             return $this->startAssessment($user);
         }
 
-        // Get the current question definition
+        Log::info('before asseement question',(array)$this->assessmentFlow);
+
         $question = $this->assessmentFlow['questions'][$currentQuestion] ?? null;
+        Log::info('asseement question',(array)$this->assessmentFlow);
+        Log::info('asseement currentQuestion'.$currentQuestion);
+
 
         if (!$question) {
-            // Unknown question, restart assessment
-            $this->sendTextMessage($user->whatsapp_phone, "Something went wrong with your assessment. Let's start over.");
+            Log::info('question'. $question . ' $currentQuestion'.$currentQuestion);
+            $this->sendTextMessage($user->whatsapp_phone, "Something went wrong. Let's start over.");
             $session->status = 'abandoned';
             $session->save();
-
             return $this->startAssessment($user);
         }
 
-        Log::info('$response', (array) $response);
-        Log::info('$question', (array) $question);
-
-        // Validate the response
-        $isValid = $this->validateResponse($response, $question);
-
-        if (!$isValid) {
-            // Re-ask the question with error message
-            $this->sendTextMessage(
-                $user->whatsapp_phone,
-                $question['error_message'] ?? "Please provide a valid response."
-            );
+        if (!$this->validateResponse($response, $question)) {
+            $this->sendTextMessage($user->whatsapp_phone, $question['error_message'] ?? "Please provide a valid response.");
             $this->askQuestion($user, $currentQuestion);
             return $session;
         }
 
-        // Handle "Other" selections that require custom input
-        if (
-            ($response === 'Other' || $response === 'other') &&
-            strpos($currentQuestion, '_custom') === false &&
-            !isset($responses[$currentQuestion . '_other'])
-        ) {
-
-            // Store the initial response
+        if (($response === 'Other' || $response === 'other') && !isset($responses[$currentQuestion . '_other'])) {
             $responses[$currentQuestion] = $response;
-
-            // Create a custom question ID for the follow-up
-            $customQuestionId = $currentQuestion . '_custom';
-
-            // Ask for custom input
-            $this->sendTextMessage($user->whatsapp_phone, "Please provide more details about your selection:");
-
-            // Update session with custom question and responses
-            $session->current_question = $customQuestionId;
-            $session->responses = $responses;
-            $session->save();
-
-            return $session;
-        }
-
-        // Handle custom input follow-up
-        // Handle custom input follow-up
-        if (strpos($currentQuestion, '_custom') !== false) {
-            // Get the base question
+            $session->current_question = $currentQuestion . '_custom';
+            $this->sendTextMessage($user->whatsapp_phone, "Please provide more details:");
+        } elseif (strpos($currentQuestion, '_custom') !== false) {
             $baseQuestion = str_replace('_custom', '', $currentQuestion);
-
-            // Log for debugging
-            Log::info("Processing custom input", [
-                'baseQuestion' => $baseQuestion,
-                'customQuestion' => $currentQuestion,
-                'response' => $response
-            ]);
-
-            // Store both the original selection and the custom input
-            // Don't try to parse comma-separated values for custom inputs
-            $responses[$currentQuestion] = $response;
             $responses[$baseQuestion . '_other'] = $response;
-
-            // Get the base question details to determine next question
-            $question = $this->assessmentFlow['questions'][$baseQuestion] ?? null;
-
-            // If base question not found, handle the error gracefully
-            if (!$question) {
-                Log::error("Base question not found for custom input", [
-                    'baseQuestion' => $baseQuestion,
-                    'currentQuestion' => $currentQuestion
-                ]);
-
-                // Send an appropriate message
-                $this->sendTextMessage(
-                    $user->whatsapp_phone,
-                    "Thank you for your detailed input. Let's continue with the assessment."
-                );
-
-                // Try to recover by getting the last valid question
-                foreach ($this->assessmentFlow['questions'] as $qId => $qData) {
-                    if (strpos($qId, '_custom') === false && isset($qData['phase'])) {
-                        $question = $qData;
-                        $currentQuestion = $qId;
-                        break;
-                    }
-                }
-
-                // If still no valid question, restart
-                if (!$question) {
-                    $this->sendTextMessage($user->whatsapp_phone, "I'm having trouble with the assessment. Let's start over.");
-                    $session->status = 'abandoned';
-                    $session->save();
-                    return $this->startAssessment($user);
-                }
-            }
-
-            // Override current question to be the base question for proper flow
-            $currentQuestion = $baseQuestion;
+        } elseif (isset($question['multiple']) && $question['multiple']) {
+            $values = array_map('trim', explode(',', $response));
+            $responses['_multiselect_' . $currentQuestion] = array_unique(array_merge($responses['_multiselect_' . $currentQuestion] ?? [], $values));
+            $responses[$currentQuestion] = $responses['_multiselect_' . $currentQuestion];
         } else {
-            // For regular (non-custom) responses
-
-            // Check if this is a multiple selection question and handle comma-separated values
-            if (isset($question['multiple']) && $question['multiple']) {
-                $values = array_map('trim', explode(',', $response));
-
-                if (!isset($responses['_multiselect_' . $currentQuestion])) {
-                    $responses['_multiselect_' . $currentQuestion] = [];
-                }
-
-                foreach ($values as $value) {
-                    if (!in_array($value, $responses['_multiselect_' . $currentQuestion])) {
-                        $responses['_multiselect_' . $currentQuestion][] = $value;
-                    }
-                }
-
-                // Store the selected options as JSON string or array
-                $responses[$currentQuestion] = $responses['_multiselect_' . $currentQuestion];
-            } else {
-                $responses[$currentQuestion] = $response;
-            }
+            $responses[$currentQuestion] = $response;
         }
 
-        Log::info("responses ", $responses);
-        Log::info("questiondddd ", $question);
-
-        // Check if this is the final question
         if (isset($question['is_final']) && $question['is_final']) {
-            // Complete the assessment
             try {
-                // Clean up internal pagination keys before completing
                 foreach (array_keys($responses) as $key) {
                     if (strpos($key, '_pagination_') === 0) {
                         unset($responses[$key]);
                     }
                 }
 
-                // Mark session as completed
                 $session->status = 'completed';
                 $session->completed_at = now();
                 $session->responses = $responses;
                 $session->save();
 
-                // Generate diet plan using AI
                 $userGym = $user->gyms()->first();
                 $aiService = AIServiceFactory::create($userGym);
 
-                $dietPlan = $aiService->generateDietPlan($session);
+                if (!$aiService) {
+                    Log::error('Failed to create AI service', ['user_id' => $user->id]);
+                    $this->sendTextMessage($user->whatsapp_phone, "We encountered an issue generating your diet plan. Please try again later.");
+                    return $session;
+                }
 
+                $dietPlan = $aiService->generateDietPlan($session);
                 if ($dietPlan) {
-                    // Send diet plan
                     $this->sendDietPlanSummary($user, $dietPlan);
                 } else {
-                    $this->sendTextMessage($user->whatsapp_phone, "I'm having trouble generating your diet plan right now. Please try again later or contact support.");
+                    $this->sendTextMessage($user->whatsapp_phone, "I'm having trouble generating your diet plan right now. Please try again later.");
                 }
             } catch (\Exception $e) {
-                Log::error('Error generating diet plan', [
-                    'error' => $e->getMessage(),
-                    'user_id' => $user->id
-                ]);
-
-                $this->sendTextMessage($user->whatsapp_phone, "I encountered an error while generating your diet plan. Please try again later or contact support.");
+                Log::error('Error generating diet plan', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+                $this->sendTextMessage($user->whatsapp_phone, "I encountered an error while generating your diet plan. Please try again later.");
             }
-
             return $session;
         }
 
-        // Determine the next question
         $nextQuestion = $this->getNextQuestion($question, $response);
-        Log::info("Current question: $currentQuestion, Response: $response, Next question: $nextQuestion");
-        Log::info("Session responses before save:", ['responses' => $session->responses]);
-
         if (!$nextQuestion) {
             $this->sendTextMessage($user->whatsapp_phone, "I'm not sure what question to ask next. Let's start over.");
             $session->status = 'abandoned';
@@ -671,16 +553,10 @@ class WhatsAppService
             return $this->startAssessment($user);
         }
 
-        // Ask the next question
         $this->askQuestion($user, $nextQuestion);
-
-        // Update session responses
         $session->responses = $responses;
         $session->current_question = $nextQuestion;
-        Log::info('session before save in function assement default',(array)$responses);
-
         $session->save();
-        Log::info("Session responses after save:", ['responses' => $session->responses]);
 
         return $session;
     }

@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             AttributeSeeder::class,
             SubscriptionFeaturesSeeder::class,
             SubscriptionPlansSeeder::class,
+            AttributeSeeder::class
         ]);
     }
 }

@@ -38,12 +38,33 @@ class ClientProfile extends Model
         'country',
         'state',
         'city',
-        // Add the missing fields
         'medications',
         'medication_details',
         'commitment_level',
         'additional_requests',
-        'meal_variety'
+        'meal_variety',
+        // 🔹 New Fields from Migration
+        'body_type',
+        'water_intake',
+        'meal_portion_size',
+        'favorite_foods',
+        'disliked_foods',
+        'past_medical_history',
+        'cooking_style',
+        'grocery_access',
+        'meal_budget',
+        'exercise_timing',
+        'sleep_hours',
+        'motivation',
+        'past_attempts',
+        'detail_level',
+        'recipe_complexity',
+        'organ_recovery_focus',
+        'religion_diet',
+        'fasting_details',
+        'work_type',
+        'cooking_time',
+        'timeline',
     ];
 
     protected $casts = [
@@ -53,8 +74,12 @@ class ClientProfile extends Model
         'cuisine_preferences' => 'array',
         'food_restrictions' => 'array',
         'meal_preferences' => 'array',
-        // Add new JSON field
         'medications' => 'array',
+        'favorite_foods' => 'array',
+        'disliked_foods' => 'array',
+        'past_medical_history' => 'array',
+        'organ_recovery_focus' => 'array',
+        'religion_diet' => 'array',
     ];
     // Relationships
     public function user()
@@ -242,5 +267,10 @@ class ClientProfile extends Model
             'custom' => 'Customized Plan',
             default => 'Standard',
         };
+    }
+
+    public function getWaterIntakeDisplayAttribute()
+    {
+        return "{$this->water_intake} liters/day";
     }
 }
