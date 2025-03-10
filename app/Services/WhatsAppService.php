@@ -288,7 +288,10 @@ class WhatsAppService
      */
     private function askQuestion(User $user, string $questionId)
     {
+        Log::info('aks question $questionId'.$questionId);
+
         $question = $this->assessmentFlow['questions'][$questionId] ?? null;
+        Log::info('aks question $question',$question);
 
         if (!$question) {
             $this->sendTextMessage($user->whatsapp_phone, "Something went wrong. Please type 'start' to begin again.");

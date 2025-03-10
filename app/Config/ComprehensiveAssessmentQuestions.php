@@ -1,5 +1,6 @@
 <?php
 namespace App\Config;
+use Illuminate\Support\Facades\Log;
 
 class ComprehensiveAssessmentQuestions
 {
@@ -18,7 +19,7 @@ class ComprehensiveAssessmentQuestions
 
         // Start with moderate questions
         $comprehensiveQuestions = $moderateQuestions;
-
+        Log::info('comprehensiveQuestions',$comprehensiveQuestions);
         // Modify the health_conditions question flow to include medications
         $comprehensiveQuestions['health_conditions']['next_conditional']['default'] = 'medications';
 

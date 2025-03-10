@@ -144,7 +144,7 @@ class GeminiService extends BaseAIService
                         'contents' => [['parts' => [['text' => $prompt]]]],
                         'generationConfig' => [
                             'temperature' => 0.7,
-                            'maxOutputTokens' => 1500,
+                            'maxOutputTokens' => 2500,
                             'topP' => 0.95,
                             'topK' => 40
                         ]
@@ -176,20 +176,24 @@ class GeminiService extends BaseAIService
                 }
 
                 // Parse JSON from response
-                if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/', $content, $matches)) {
-                    $jsonStr = $matches[1];
-                } else {
-                    $jsonStr = $content;
+                Log::info('Raw response from Gemini:', ['content' => $content]);
+
+                // Ensure the response is a string and remove Markdown JSON block if present
+                $jsonStr = trim($content);
+                if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/', $jsonStr, $matches)) {
+                    $jsonStr = trim($matches[1]);
                 }
 
-                $mealData = json_decode($jsonStr, true);
+                Log::info('Extracted JSON string:', ['json' => $jsonStr]);
 
+                // Decode JSON and check for errors
+                $mealData = json_decode($jsonStr, true);
                 if (json_last_error() !== JSON_ERROR_NONE) {
-                    Log::error('JSON parsing error', [
+                    Log::error('JSON parsing error:', [
                         'error' => json_last_error_msg(),
-                        'content' => $content
+                        'content' => $jsonStr
                     ]);
-                    throw new Exception('Failed to parse Gemini response as JSON');
+                    throw new Exception('Failed to parse Gemini response as JSON: ' . json_last_error_msg());
                 }
 
                 // Clear existing meals if any (for re-generation)

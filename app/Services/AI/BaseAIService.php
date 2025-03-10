@@ -51,6 +51,27 @@ abstract class BaseAIService implements AIServiceInterface
             'cooking_capability' => $profile->cooking_capability ?? 'basic',
             'exercise_routine' => $profile->exercise_routine ?? 'minimal',
             'stress_sleep' => $profile->stress_sleep ?? 'moderate',
+            'body_type' => $profile->body_type ?? null,
+            'water_intake' => $profile->water_intake ?? null,
+            'meal_portion_size' => $profile->meal_portion_size ?? null,
+            'favorite_foods' => $profile->favorite_foods ?? null,
+            'disliked_foods' => $profile->disliked_foods ?? null,
+            'past_medical_history' => $profile->past_medical_history ?? null,
+            'cooking_style' => $profile->cooking_style ?? null,
+            'grocery_access' => $profile->grocery_access ?? null,
+            'meal_budget' => $profile->meal_budget ?? null,
+            'exercise_timing' => $profile->exercise_timing ?? null,
+            'sleep_hours' => $profile->sleep_hours ?? null,
+            'motivation' => $profile->motivation ?? null,
+            'past_attempts' => $profile->past_attempts ?? null,
+            'detail_level' => $profile->detail_level ?? null,
+            'recipe_complexity' => $profile->recipe_complexity ?? null,
+            'organ_recovery_focus' => $profile->organ_recovery_focus ?? null,
+            'religion_diet' => $profile->religion_diet ?? null,
+            'fasting_details' => $profile->fasting_details ?? null,
+            'work_type' => $profile->work_type ?? null,
+            'cooking_time' => $profile->cooking_time ?? null,
+            'timeline' => $profile->goal_timeline ?? null,
         ]);
         Log::info('Meal plans generated', ['diet_plan_id' => $dietPlan->id]);
 
@@ -175,6 +196,70 @@ abstract class BaseAIService implements AIServiceInterface
 
         if (isset($responses['city'])) {
             $profile->city = $responses['city'];
+        }
+ 
+        if (isset($responses['body_type'])) {
+            $profile->body_type = $responses['body_type'];
+        }
+        if (isset($responses['water_intake'])) {
+            $profile->water_intake = $responses['water_intake'];
+        }
+        if (isset($responses['meal_portion_size'])) {
+            $profile->meal_portion_size = $responses['meal_portion_size'];
+        }
+        if (isset($responses['favorite_foods'])) {
+            $profile->favorite_foods = $this->formatListResponse($responses['favorite_foods']);
+        }
+        if (isset($responses['disliked_foods'])) {
+            $profile->disliked_foods = $this->formatListResponse($responses['disliked_foods']);
+        }
+        if (isset($responses['past_medical_history'])) {
+            $profile->past_medical_history = $this->formatListResponse($responses['past_medical_history']);
+        }
+        if (isset($responses['cooking_style'])) {
+            $profile->cooking_style = $responses['cooking_style'];
+        }
+        if (isset($responses['grocery_access'])) {
+            $profile->grocery_access = $responses['grocery_access'];
+        }
+        if (isset($responses['meal_budget'])) {
+            $profile->meal_budget = $responses['meal_budget'];
+        }
+        if (isset($responses['exercise_timing'])) {
+            $profile->exercise_timing = $responses['exercise_timing'];
+        }
+        if (isset($responses['sleep_hours'])) {
+            $profile->sleep_hours = $responses['sleep_hours'];
+        }
+        if (isset($responses['motivation'])) {
+            $profile->motivation = $responses['motivation'];
+        }
+        if (isset($responses['past_attempts'])) {
+            $profile->past_attempts = $this->formatListResponse($responses['past_attempts']);
+        }
+        if (isset($responses['detail_level'])) {
+            $profile->detail_level = $responses['detail_level'];
+        }
+        if (isset($responses['recipe_complexity'])) {
+            $profile->recipe_complexity = $responses['recipe_complexity'];
+        }
+        if (isset($responses['organ_recovery_focus'])) {
+            $profile->organ_recovery_focus = $this->formatListResponse($responses['organ_recovery_focus']);
+        }
+        if (isset($responses['religion_diet'])) {
+            $profile->religion_diet = $responses['religion_diet'];
+        }
+        if (isset($responses['fasting_details'])) {
+            $profile->fasting_details = $responses['fasting_details'];
+        }
+        if (isset($responses['work_type'])) {
+            $profile->work_type = $responses['work_type'];
+        }
+        if (isset($responses['cooking_time'])) {
+            $profile->cooking_time = $responses['cooking_time'];
+        }
+        if (isset($responses['timeline'])) {
+            $profile->timeline = $this->mapTimeline($responses['timeline']);
         }
 
         $profile->save();
