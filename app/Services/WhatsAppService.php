@@ -24,6 +24,7 @@ class WhatsAppService
 
     protected $assessmentFlow;
 
+    protected $helpMediaID;
     public function __construct(
         GroceryListService $groceryListService,
         NutritionInfoService $nutritionInfoService,
@@ -37,6 +38,8 @@ class WhatsAppService
         $this->groceryListService = $groceryListService;
         $this->nutritionInfoService = $nutritionInfoService;
         $this->progressTrackingService = $progressTrackingService;
+
+        $this->helpMediaID = 9942940672384649;
     }
 
     /**
@@ -44,7 +47,7 @@ class WhatsAppService
      */
     private function loadAssessmentFlow($level = 'moderate')
     {
-        Log::info('leve of assement'. $level);
+        Log::info('leve of assement' . $level);
         // Get user language preference (from database or session)
         $userLang = 'en'; // Default to English
 
@@ -90,11 +93,6 @@ class WhatsAppService
             ->where('status', 'in_progress')
             ->latest()
             ->first();
-
-        if ($session) {
-            // Continue assessment
-            return $this->continueAssessment($user, $session, $content);
-        }
 
         // Otherwise, check for commands
         $lowerContent = strtolower(trim($content));
@@ -150,6 +148,10 @@ class WhatsAppService
             return null;
         }
 
+        if ($session) {
+            // Continue assessment
+            return $this->continueAssessment($user, $session, $content);
+        }
         // Default response
         $this->sendTextMessage($user->whatsapp_phone, "I'm not sure what you mean. Type 'help' for a list of commands or 'start' to begin a new assessment.");
         return null;
@@ -161,30 +163,222 @@ class WhatsAppService
      */
     private function startAssessment(User $user)
     {
-        // Check if there's an assessment in progress
-        $existingSession = AssessmentSession::where('user_id', $user->id)
-            ->where('status', 'in_progress')
-            ->first();
+        // Check for existing context
+        $userContext = $this->getUserContext($user);
 
-        if ($existingSession) {
-            $this->sendTextMessage($user->whatsapp_phone, "You already have an assessment in progress. Would you like to continue or start over?", [
-                'type' => 'interactive',
-                'interactive' => [
-                    'type' => 'button',
-                    'body' => ['text' => "You already have an assessment in progress. Would you like to continue or start over?"],
-                    'action' => [
-                        'buttons' => [
-                            ['type' => 'reply', 'reply' => ['id' => 'continue', 'title' => 'Continue']],
-                            ['type' => 'reply', 'reply' => ['id' => 'restart', 'title' => 'Start Over']]
-                        ]
-                    ]
-                ]
-            ]);
-
-            return null;
+        if ($userContext['has_active_plan']) {
+            return $this->handleExistingPlanOptions($user, $userContext['active_plan']);
         }
 
-        // Ask the user which assessment plan they prefer before starting
+        if ($userContext['has_incomplete_assessment']) {
+            return $this->handleIncompleteAssessment($user, $userContext['incomplete_session']);
+        }
+
+        if ($userContext['has_profile']) {
+            return $this->handleExistingProfileOptions($user);
+        }
+
+        // Only reach here for completely new users
+        return $this->startNewUserAssessment($user);
+    }
+
+    private function getUserContext(User $user)
+    {
+        $context = [
+            'has_profile' => false,
+            'has_active_plan' => false,
+            'has_incomplete_assessment' => false,
+            'active_plan' => null,
+            'incomplete_session' => null,
+            'last_assessment_date' => null,
+            'profile_completion' => 0
+        ];
+
+        // Check for active diet plan
+        $activePlan = DietPlan::where('client_id', $user->id)
+            ->where('status', 'active')
+            ->latest()
+            ->first();
+
+        if ($activePlan) {
+            $context['has_active_plan'] = true;
+            $context['active_plan'] = $activePlan;
+        }
+
+        // Check for incomplete assessment
+        $incompleteSession = AssessmentSession::where('user_id', $user->id)
+            ->where('status', 'in_progress')
+            ->where('updated_at', '>', now()->subDays(7)) // Only sessions updated in the last 7 days
+            ->latest()
+            ->first();
+
+        if ($incompleteSession) {
+            $context['has_incomplete_assessment'] = true;
+            $context['incomplete_session'] = $incompleteSession;
+        }
+
+        // Check profile completion
+        $profileFields = ['age', 'gender', 'height', 'current_weight', 'target_weight', 'activity_level'];
+        $filledFields = 0;
+
+        foreach ($profileFields as $field) {
+            if (!empty($user->$field)) {
+                $filledFields++;
+            }
+        }
+
+        $context['profile_completion'] = ($filledFields / count($profileFields)) * 100;
+        $context['has_profile'] = $context['profile_completion'] > 50; // Consider profile exists if more than 50% complete
+
+        return $context;
+    }
+
+    /**
+     * Complete an assessment session and generate a diet plan
+     * 
+     * @param AssessmentSession $session The assessment session to complete
+     * @return AssessmentSession The completed session
+     */
+    private function completeAssessment(AssessmentSession $session)
+    {
+        try {
+            $responses = $session->responses;
+
+            // Remove any internal tracking keys
+            foreach (array_keys($responses) as $key) {
+                if (strpos($key, '_pagination_') === 0 || strpos($key, '_multiselect_') === 0) {
+                    unset($responses[$key]);
+                }
+            }
+
+            $session->status = 'completed';
+            $session->completed_at = now();
+            $session->responses = $responses;
+            $session->save();
+
+            $user = User::find($session->user_id);
+            $userGym = $user->gyms()->first();
+
+            // You'll need to ensure this class exists and is properly imported
+            $aiService = AIServiceFactory::create($userGym);
+
+            if (!$aiService) {
+                Log::error('Failed to create AI service', ['user_id' => $user->id]);
+                $this->sendTextMessage($user->whatsapp_phone, "We encountered an issue generating your diet plan. Please try again later.");
+                return $session;
+            }
+
+            // Generate the diet plan
+            $dietPlan = $aiService->generateDietPlan($session);
+
+            if ($dietPlan) {
+                $this->sendDietPlanSummary($user, $dietPlan);
+            } else {
+                $this->sendTextMessage($user->whatsapp_phone, "I'm having trouble generating your diet plan right now. Please try again later.");
+            }
+
+            return $session;
+        } catch (\Exception $e) {
+            Log::error('Error completing assessment', [
+                'error' => $e->getMessage(),
+                'user_id' => $session->user_id
+            ]);
+
+            $this->sendTextMessage(
+                User::find($session->user_id)->whatsapp_phone,
+                "I encountered an error while generating your diet plan. Please try again later."
+            );
+
+            return $session;
+        }
+    }
+
+    /**
+     * Handle options for users with incomplete assessments
+     * 
+     * @param User $user The user
+     * @param AssessmentSession $incompleteSession The incomplete assessment session
+     * @return AssessmentSession
+     */
+    private function handleIncompleteAssessment(User $user, AssessmentSession $incompleteSession)
+    {
+        // Calculate completion percentage
+        $this->loadAssessmentFlow($incompleteSession->assessment_type ?? 'moderate');
+        $totalQuestions = count($this->assessmentFlow['questions']);
+        $answeredQuestions = count(array_filter(array_keys($incompleteSession->responses ?? []), function ($key) {
+            return !str_starts_with($key, '_');
+        }));
+
+        $completionPercentage = round(($answeredQuestions / $totalQuestions) * 100);
+        $lastActive = $incompleteSession->updated_at->diffForHumans();
+
+        $this->sendTextMessage($user->whatsapp_phone, "You have an incomplete assessment that's about {$completionPercentage}% complete. You last worked on it {$lastActive}.", [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => "Would you like to continue or start over?"],
+                'action' => [
+                    'buttons' => [
+                        ['type' => 'reply', 'reply' => ['id' => 'continue', 'title' => 'Continue']],
+                        ['type' => 'reply', 'reply' => ['id' => 'restart', 'title' => 'Start Over']],
+                        ['type' => 'reply', 'reply' => ['id' => 'change_type', 'title' => 'Change Plan Type']]
+                    ]
+                ]
+            ]
+        ]);
+
+        // Update the session to indicate we're waiting for a response about continuing
+        $incompleteSession->current_question = 'resume_decision';
+        $incompleteSession->save();
+
+        return $incompleteSession;
+    }
+
+    /**
+     * Handle options for users with existing profiles but no active plan
+     * 
+     * @param User $user The user with an existing profile
+     * @return AssessmentSession
+     */
+    private function handleExistingProfileOptions(User $user)
+    {
+        $this->sendTextMessage($user->whatsapp_phone, "Welcome back! We already have some of your information.", [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => "What would you like to do?"],
+                'action' => [
+                    'buttons' => [
+                        ['type' => 'reply', 'reply' => ['id' => 'use_existing', 'title' => 'Use My Profile']],
+                        ['type' => 'reply', 'reply' => ['id' => 'update_profile', 'title' => 'Update Profile']],
+                        ['type' => 'reply', 'reply' => ['id' => 'new_assessment', 'title' => 'Start Fresh']]
+                    ]
+                ]
+            ]
+        ]);
+
+        // Create a new session to track the user's decision
+        $session = new AssessmentSession();
+        $session->user_id = $user->id;
+        $session->current_phase = -2; // Special phase for existing profile decision
+        $session->current_question = 'existing_profile_options';
+        $session->responses = [];
+        $session->status = 'in_progress';
+        $session->started_at = now();
+        $session->save();
+
+        return $session;
+    }
+
+
+    /**
+     * Start a completely new assessment for a new user
+     * 
+     * @param User $user The new user
+     * @return AssessmentSession
+     */
+    private function startNewUserAssessment(User $user)
+    {
         $this->sendTextMessage($user->whatsapp_phone, "👋 Welcome to your personalized diet planning assistant!", [
             'type' => 'interactive',
             'interactive' => [
@@ -192,33 +386,15 @@ class WhatsAppService
                 'body' => ['text' => "Please select an assessment type:"],
                 'action' => [
                     'buttons' => [
-                        [
-                            'type' => 'reply',
-                            'reply' => [
-                                'id' => 'quick',
-                                'title' => 'Quick (2 min)'
-                            ]
-                        ],
-                        [
-                            'type' => 'reply',
-                            'reply' => [
-                                'id' => 'moderate',
-                                'title' => 'Detailed (5 min)'
-                            ]
-                        ],
-                        [
-                            'type' => 'reply',
-                            'reply' => [
-                                'id' => 'comprehensive',
-                                'title' => 'Complete (10 min)'
-                            ]
-                        ]
+                        ['type' => 'reply', 'reply' => ['id' => 'quick', 'title' => 'Quick (2 min)']],
+                        ['type' => 'reply', 'reply' => ['id' => 'moderate', 'title' => 'Detailed (5 min)']],
+                        ['type' => 'reply', 'reply' => ['id' => 'comprehensive', 'title' => 'Complete (10 min)']]
                     ]
                 ]
             ]
         ]);
 
-        // Create a temporary session to track that we're waiting for assessment type selection
+        // Create a new session for plan type selection
         $session = new AssessmentSession();
         $session->user_id = $user->id;
         $session->current_phase = 0; // Special phase 0 for plan selection
@@ -227,6 +403,45 @@ class WhatsAppService
         $session->status = 'in_progress';
         $session->started_at = now();
         $session->save();
+
+        return $session;
+    }
+    private function transitionPlanType(AssessmentSession $session, string $newType)
+    {
+        $currentType = $session->assessment_type ?? 'quick';
+        $responses = $session->responses ?? [];
+
+        // Store the transition in responses
+        $responses['previous_assessment_type'] = $currentType;
+        $responses['transitioned_at'] = now()->toDateTimeString();
+
+        // Get question sets for both types
+        $this->loadAssessmentFlow($currentType);
+        $currentQuestions = $this->assessmentFlow['questions'];
+
+        $this->loadAssessmentFlow($newType);
+        $newQuestions = $this->assessmentFlow['questions'];
+
+        // Determine which questions are new
+        $newQuestionIds = array_diff(array_keys($newQuestions), array_keys($currentQuestions));
+
+        // Update session
+        $session->assessment_type = $newType;
+        $session->responses = $responses;
+        $session->save();
+
+        // Inform user about the transition
+        $message = "You've switched from a {$currentType} to a {$newType} assessment. ";
+        $message .= "We'll use your existing information and just ask " . count($newQuestionIds) . " additional questions.";
+        $this->sendTextMessage($session->user->whatsapp_phone, $message);
+
+        // Start asking new questions if any
+        if (count($newQuestionIds) > 0) {
+            $this->askQuestion($session->user, $newQuestionIds[0]);
+        } else {
+            // If no new questions, complete the assessment
+            return $this->completeAssessment($session);
+        }
 
         return $session;
     }
@@ -265,7 +480,7 @@ class WhatsAppService
         $responses['assessment_type'] = $assessmentType;
         $session->responses = $responses;
 
-        Log::info('assessmentType-step'.$assessmentType);
+        Log::info('assessmentType-step' . $assessmentType);
         // Load the appropriate question set
         $this->loadAssessmentFlow($assessmentType);
 
@@ -284,14 +499,53 @@ class WhatsAppService
 
 
     /**
+     * Handle options for users with existing active diet plans
+     * 
+     * @param User $user The user
+     * @param DietPlan $activePlan The user's active diet plan
+     * @return AssessmentSession|null
+     */
+    private function handleExistingPlanOptions(User $user, DietPlan $activePlan)
+    {
+        $this->sendTextMessage($user->whatsapp_phone, "You already have an active diet plan created on " . $activePlan->created_at->format('M d, Y') . ".", [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => "What would you like to do?"],
+                'action' => [
+                    'buttons' => [
+                        ['type' => 'reply', 'reply' => ['id' => 'view_plan', 'title' => 'View Plan']],
+                        ['type' => 'reply', 'reply' => ['id' => 'modify_plan', 'title' => 'Modify Plan']],
+                        ['type' => 'reply', 'reply' => ['id' => 'new_plan', 'title' => 'Create New Plan']]
+                    ]
+                ]
+            ]
+        ]);
+
+        // Create temporary session to track the user's response to this menu
+        $session = new AssessmentSession();
+        $session->user_id = $user->id;
+        $session->current_phase = -1; // Special phase for existing plan options
+        $session->current_question = 'existing_plan_options';
+        $session->responses = [
+            'active_plan_id' => $activePlan->id
+        ];
+        $session->status = 'in_progress';
+        $session->started_at = now();
+        $session->save();
+
+        return $session;
+    }
+
+    /**
      * Ask a specific question based on its ID
      */
     private function askQuestion(User $user, string $questionId)
     {
-        Log::info('aks question $questionId'.$questionId);
+        Log::info('aks question $questionId' . $questionId);
 
         $question = $this->assessmentFlow['questions'][$questionId] ?? null;
-        Log::info('aks question $question',$question);
+        Log::info('aks question $question', $question);
 
         if (!$question) {
             $this->sendTextMessage($user->whatsapp_phone, "Something went wrong. Please type 'start' to begin again.");
@@ -445,16 +699,55 @@ class WhatsAppService
      */
     private function continueAssessment(User $user, AssessmentSession $session, string $response, string $displayText = null)
     {
+        // Handle special case of initial assessment type selection
         if ($session->current_phase === 0 && $session->current_question === 'assessment_type') {
             return $this->handleAssessmentTypeSelection($user, $session, $response);
         }
 
+        // Handle resumption decision responses
+        if ($session->current_question === 'resume_decision') {
+            if ($response === 'continue') {
+                return $this->resumeAssessment($user, $session);
+            } elseif ($response === 'restart') {
+                $session->status = 'abandoned';
+                $session->save();
+                return $this->startAssessment($user);
+            } elseif ($response === 'change_type') {
+                return $this->askPlanTypeChange($user, $session);
+            }
+        }
+
+        // Handle plan type change requests
+        if (Str::startsWith($response, 'switch_')) {
+            $newType = str_replace('switch_', '', $response);
+            return $this->transitionPlanType($session, $newType);
+        }
+
+        // Handle existing profile options
+        if ($session->current_phase === -2 && $session->current_question === 'existing_profile_options') {
+            if ($response === 'use_existing') {
+                return $this->startNewAssessmentWithExistingProfile($user);
+            } elseif ($response === 'update_profile') {
+                return $this->startProfileUpdate($user);
+            } elseif ($response === 'new_assessment') {
+                $session->status = 'abandoned';
+                $session->save();
+                return $this->startNewUserAssessment($user);
+            }
+        }
+
+        // Handle existing plan options
+        if ($session->current_phase === -1 && $session->current_question === 'existing_plan_options') {
+            return $this->processExistingPlanChoice($user, $response, $this->getCurrentDietPlan($user));
+        }
+
+        // Load assessment flow for current session type
         $this->loadAssessmentFlow($session->assessment_type);
-        Log::info('current seesion',array($session));
 
         $currentQuestion = $session->current_question;
         $responses = $session->responses ?? [];
 
+        // Handle pagination for list questions
         $paginationKey = '_pagination_' . $currentQuestion;
         $pagination = $responses[$paginationKey] ?? null;
 
@@ -471,33 +764,24 @@ class WhatsAppService
             return $session;
         }
 
-        if ($response === 'restart') {
-            $session->status = 'abandoned';
-            $session->save();
-            return $this->startAssessment($user);
-        }
-
-        Log::info('before asseement question',(array)$this->assessmentFlow);
-
+        // Get current question details
         $question = $this->assessmentFlow['questions'][$currentQuestion] ?? null;
-        Log::info('asseement question',(array)$this->assessmentFlow);
-        Log::info('asseement currentQuestion'.$currentQuestion);
-
 
         if (!$question) {
-            Log::info('question'. $question . ' $currentQuestion'.$currentQuestion);
             $this->sendTextMessage($user->whatsapp_phone, "Something went wrong. Let's start over.");
             $session->status = 'abandoned';
             $session->save();
             return $this->startAssessment($user);
         }
 
+        // Validate user response
         if (!$this->validateResponse($response, $question)) {
             $this->sendTextMessage($user->whatsapp_phone, $question['error_message'] ?? "Please provide a valid response.");
             $this->askQuestion($user, $currentQuestion);
             return $session;
         }
 
+        // Store response based on question type
         if (($response === 'Other' || $response === 'other') && !isset($responses[$currentQuestion . '_other'])) {
             $responses[$currentQuestion] = $response;
             $session->current_question = $currentQuestion . '_custom';
@@ -513,8 +797,10 @@ class WhatsAppService
             $responses[$currentQuestion] = $response;
         }
 
+        // Check if this is the final question
         if (isset($question['is_final']) && $question['is_final']) {
             try {
+                // Clean up response data
                 foreach (array_keys($responses) as $key) {
                     if (strpos($key, '_pagination_') === 0) {
                         unset($responses[$key]);
@@ -526,6 +812,7 @@ class WhatsAppService
                 $session->responses = $responses;
                 $session->save();
 
+                // Generate diet plan
                 $userGym = $user->gyms()->first();
                 $aiService = AIServiceFactory::create($userGym);
 
@@ -548,7 +835,39 @@ class WhatsAppService
             return $session;
         }
 
+        // Determine next question
         $nextQuestion = $this->getNextQuestion($question, $response);
+
+        // Check if we need to skip this question based on existing profile data
+        if ($this->shouldSkipQuestion($user, $nextQuestion)) {
+            // Get answer from profile and store it
+            $profileAnswer = $this->getAnswerFromProfile($user, $nextQuestion);
+            if ($profileAnswer !== null) {
+                $responses[$nextQuestion] = $profileAnswer;
+
+                // Log the auto-filled answer
+                Log::info('Auto-filled question from profile', [
+                    'question' => $nextQuestion,
+                    'answer' => $profileAnswer
+                ]);
+
+                // Recursively move to the next question
+                $session->responses = $responses;
+                $session->current_question = $nextQuestion;
+                $session->save();
+
+                // Get next question's details
+                $nextQuestionData = $this->assessmentFlow['questions'][$nextQuestion] ?? null;
+                if ($nextQuestionData) {
+                    $nextNextQuestion = $this->getNextQuestion($nextQuestionData, $profileAnswer);
+                    if ($nextNextQuestion) {
+                        return $this->continueAssessment($user, $session, $profileAnswer);
+                    }
+                }
+            }
+        }
+
+        // If no valid next question, start over
         if (!$nextQuestion) {
             $this->sendTextMessage($user->whatsapp_phone, "I'm not sure what question to ask next. Let's start over.");
             $session->status = 'abandoned';
@@ -556,10 +875,467 @@ class WhatsAppService
             return $this->startAssessment($user);
         }
 
+        // Ask the next question and update session
         $this->askQuestion($user, $nextQuestion);
         $session->responses = $responses;
         $session->current_question = $nextQuestion;
         $session->save();
+
+        return $session;
+    }
+
+
+    /**
+     * Process the user's choice for their existing plan
+     * 
+     * @param User $user The user
+     * @param string $choice The user's choice (view_plan, modify_plan, new_plan)
+     * @param DietPlan $activePlan The user's active plan
+     * @return mixed Result of processing
+     */
+    private function processExistingPlanChoice(User $user, string $choice, DietPlan $activePlan)
+    {
+        switch ($choice) {
+            case 'view_plan':
+                return $this->sendDietPlanSummary($user, $activePlan);
+
+            case 'modify_plan':
+                return $this->startPlanModification($user, $activePlan);
+
+            case 'new_plan':
+                // Archive current plan
+                $activePlan->status = 'archived';
+                $activePlan->save();
+
+                // Start new assessment with context
+                return $this->startNewAssessmentWithContext($user);
+
+            default:
+                $this->sendTextMessage($user->whatsapp_phone, "I didn't understand your choice. Please try again.");
+                return $this->handleExistingPlanOptions($user, $activePlan);
+        }
+    }
+
+    /**
+     * Start a new assessment with context from a previous plan
+     * 
+     * @param User $user The user
+     * @return AssessmentSession The new session
+     */
+    private function startNewAssessmentWithContext(User $user)
+    {
+        // Create a new session
+        $session = new AssessmentSession();
+        $session->user_id = $user->id;
+        $session->current_phase = 0;
+        $session->current_question = 'assessment_type';
+        $session->responses = [];
+        $session->status = 'in_progress';
+        $session->started_at = now();
+        $session->save();
+
+        // Ask for assessment type
+        $this->sendTextMessage($user->whatsapp_phone, "Great! Let's create a new diet plan. First, let's select an assessment type:", [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => "Please select an assessment type:"],
+                'action' => [
+                    'buttons' => [
+                        ['type' => 'reply', 'reply' => ['id' => 'quick', 'title' => 'Quick (2 min)']],
+                        ['type' => 'reply', 'reply' => ['id' => 'moderate', 'title' => 'Detailed (5 min)']],
+                        ['type' => 'reply', 'reply' => ['id' => 'comprehensive', 'title' => 'Complete (10 min)']]
+                    ]
+                ]
+            ]
+        ]);
+
+        return $session;
+    }
+
+    /**
+     * Start the process of modifying an existing plan
+     * 
+     * @param User $user The user
+     * @param DietPlan $plan The plan to modify
+     * @return AssessmentSession The new session for modification
+     */
+    private function startPlanModification(User $user, DietPlan $plan)
+    {
+        $this->sendTextMessage($user->whatsapp_phone, "What would you like to modify in your plan?", [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => "Please select what you'd like to change:"],
+                'action' => [
+                    'buttons' => [
+                        ['type' => 'reply', 'reply' => ['id' => 'calories', 'title' => 'Calorie Goal']],
+                        ['type' => 'reply', 'reply' => ['id' => 'macros', 'title' => 'Macro Ratios']],
+                        ['type' => 'reply', 'reply' => ['id' => 'meal_types', 'title' => 'Meal Structure']]
+                    ]
+                ]
+            ]
+        ]);
+
+        // Create modification session
+        $session = new AssessmentSession();
+        $session->user_id = $user->id;
+        $session->current_phase = -3; // Special phase for plan modification
+        $session->current_question = 'plan_modification_type';
+        $session->responses = [
+            'plan_id' => $plan->id,
+            'modification_started_at' => now()->toDateTimeString()
+        ];
+        $session->status = 'in_progress';
+        $session->started_at = now();
+        $session->save();
+
+        return $session;
+    }
+
+    /**
+     * Resume an assessment from where the user left off
+     * 
+     * @param User $user The user
+     * @param AssessmentSession $session The session to resume
+     * @return AssessmentSession The updated session
+     */
+    private function resumeAssessment(User $user, AssessmentSession $session)
+    {
+        // Check if the session has timed out
+        if ($this->handleSessionTimeout($session, $user)) {
+            return null;
+        }
+
+        // Calculate progress so far
+        $this->loadAssessmentFlow($session->assessment_type ?? 'moderate');
+        $totalQuestions = count($this->assessmentFlow['questions']);
+        $answeredQuestions = count(array_filter(array_keys($session->responses ?? []), function ($key) {
+            return !str_starts_with($key, '_');
+        }));
+
+        $progress = round(($answeredQuestions / $totalQuestions) * 100);
+
+        // Generate a summary of key answers so far
+        $summary = $this->generateResponseSummary($session);
+
+        // Send a welcome back message with progress and summary
+        $message = "Welcome back to your assessment! You're {$progress}% complete.\n\n";
+        if (!empty($summary)) {
+            $message .= "Here's what you've told me so far:\n";
+            $message .= $summary;
+            $message .= "\n\n";
+        }
+        $message .= "Let's continue with the next question:";
+
+        $this->sendTextMessage($user->whatsapp_phone, $message);
+
+        // Ask the current question again
+        $this->askQuestion($user, $session->current_question);
+
+        return $session;
+    }
+
+    /**
+     * Check if a session has timed out and handle accordingly
+     * 
+     * @param AssessmentSession $session The session to check
+     * @param User $user The user
+     * @return bool Whether the session has timed out
+     */
+    private function handleSessionTimeout(AssessmentSession $session, User $user): bool
+    {
+        $timeoutDays = 7; // Sessions expire after 7 days
+
+        if ($session->updated_at->diffInDays(now()) > $timeoutDays) {
+            $this->sendTextMessage(
+                $user->whatsapp_phone,
+                "Your previous assessment has expired. Let's start a fresh one to ensure we have your most current information."
+            );
+
+            // Mark old session as expired
+            $session->status = 'expired';
+            $session->save();
+
+            // Start new assessment
+            $this->startAssessment($user);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Generate a summary of the key information provided in the assessment
+     * 
+     * @param AssessmentSession $session The session
+     * @return string A formatted summary
+     */
+    private function generateResponseSummary(AssessmentSession $session): string
+    {
+        $responses = $session->responses ?? [];
+        $summary = "";
+
+        // Include only key information in the summary
+        $keyFields = [
+            'age' => 'Age',
+            'gender' => 'Gender',
+            'current_weight' => 'Current weight',
+            'target_weight' => 'Target weight',
+            'primary_goal' => 'Primary goal',
+            'diet_type' => 'Diet type'
+        ];
+
+        foreach ($keyFields as $field => $label) {
+            if (isset($responses[$field])) {
+                $summary .= "• {$label}: {$responses[$field]}\n";
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Determine if a question should be skipped based on existing profile data
+     */
+    private function shouldSkipQuestion(User $user, string $questionId): bool
+    {
+        // Only skip questions for non-dynamic fields
+        $dynamicFields = ['current_weight', 'target_weight', 'primary_goal', 'allergies'];
+        if (in_array($questionId, $dynamicFields)) {
+            return false;
+        }
+
+        // Map question IDs to profile fields
+        $fieldMapping = [
+            'age' => 'age',
+            'gender' => 'gender',
+            'height' => 'height',
+            'body_type' => 'body_type',
+            // Add other mappings as needed
+        ];
+
+        // Only check fields that we have a mapping for
+        if (!isset($fieldMapping[$questionId])) {
+            return false;
+        }
+
+        $profileField = $fieldMapping[$questionId];
+        $profileData = $user->getAttributes();
+
+        // Skip if we have valid profile data for this field
+        return !empty($profileData[$profileField]) && $this->isDataRecent($questionId, $user);
+    }
+
+    /**
+     * Get answer from user profile for a specific question
+     */
+    private function getAnswerFromProfile(User $user, string $questionId): ?string
+    {
+        // Map question IDs to profile fields
+        $fieldMapping = [
+            'age' => 'age',
+            'gender' => 'gender',
+            'height' => 'height',
+            'body_type' => 'body_type',
+            'activity_level' => 'activity_level',
+            // Add other mappings as needed
+        ];
+
+        if (!isset($fieldMapping[$questionId])) {
+            return null;
+        }
+
+        $profileField = $fieldMapping[$questionId];
+        $profileData = $user->getAttributes();
+
+        return $profileData[$profileField] ?? null;
+    }
+
+    /**
+     * Check if data for a particular field is recent enough to be trusted
+     */
+    private function isDataRecent(string $field, User $user): bool
+    {
+        // Define how recent data needs to be for different fields
+        $recencyRequirements = [
+            'current_weight' => 30, // Days
+            'target_weight' => 60,
+            'activity_level' => 60,
+            'health_conditions' => 90,
+            // Default for other fields
+            'default' => 180
+        ];
+
+        // For this implementation, we'll just consider profile data recent enough
+        // In a full implementation, you'd check when the profile was last updated
+        return true;
+    }
+
+    /**
+     * Start a new assessment using the existing profile data
+     */
+    private function startNewAssessmentWithExistingProfile(User $user)
+    {
+        // Create a new session
+        $session = new AssessmentSession();
+        $session->user_id = $user->id;
+        $session->current_phase = 0;
+        $session->current_question = 'assessment_type';
+        $session->responses = [];
+        $session->status = 'in_progress';
+        $session->started_at = now();
+        $session->save();
+
+        // Ask for assessment type
+        $this->sendTextMessage($user->whatsapp_phone, "Great! We'll use your existing profile information. First, let's select an assessment type:", [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => "Please select an assessment type:"],
+                'action' => [
+                    'buttons' => [
+                        ['type' => 'reply', 'reply' => ['id' => 'quick', 'title' => 'Quick (2 min)']],
+                        ['type' => 'reply', 'reply' => ['id' => 'moderate', 'title' => 'Detailed (5 min)']],
+                        ['type' => 'reply', 'reply' => ['id' => 'comprehensive', 'title' => 'Complete (10 min)']]
+                    ]
+                ]
+            ]
+        ]);
+
+        return $session;
+    }
+
+    /**
+     * Start a profile update process
+     */
+    private function startProfileUpdate(User $user)
+    {
+        // Create a new session specifically for profile updates
+        $session = new AssessmentSession();
+        $session->user_id = $user->id;
+        $session->current_phase = -3; // Special phase for profile updates
+        $session->current_question = 'profile_update_start';
+        $session->responses = [];
+        $session->status = 'in_progress';
+        $session->started_at = now();
+        $session->save();
+
+        // Ask what profile information they want to update
+        $this->sendTextMessage($user->whatsapp_phone, "What information would you like to update?", [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => "Please select what to update:"],
+                'action' => [
+                    'buttons' => [
+                        ['type' => 'reply', 'reply' => ['id' => 'update_weight', 'title' => 'Current Weight']],
+                        ['type' => 'reply', 'reply' => ['id' => 'update_goals', 'title' => 'Goals']],
+                        ['type' => 'reply', 'reply' => ['id' => 'update_health', 'title' => 'Health Info']]
+                    ]
+                ]
+            ]
+        ]);
+
+        return $session;
+    }
+
+    /**
+     * Ask user which plan type they want to change to
+     */
+    private function askPlanTypeChange(User $user)
+    {
+        $this->sendTextMessage($user->whatsapp_phone, "Which assessment type would you like to switch to?", [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => "Please select a new assessment type:"],
+                'action' => [
+                    'buttons' => [
+                        ['type' => 'reply', 'reply' => ['id' => 'switch_quick', 'title' => 'Quick (2 min)']],
+                        ['type' => 'reply', 'reply' => ['id' => 'switch_moderate', 'title' => 'Detailed (5 min)']],
+                        ['type' => 'reply', 'reply' => ['id' => 'switch_comprehensive', 'title' => 'Complete (10 min)']]
+                    ]
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * Handle plan type change request
+     */
+    private function handlePlanTypeChange(User $user, string $newType)
+    {
+        // Clean up the input
+        $newType = strtolower(trim($newType));
+
+        // Map button IDs to plan types
+        if (Str::startsWith($newType, 'switch_')) {
+            $newType = str_replace('switch_', '', $newType);
+        }
+
+        // Validate plan type
+        $validTypes = ['quick', 'moderate', 'comprehensive'];
+        if (!in_array($newType, $validTypes)) {
+            $this->sendTextMessage(
+                $user->whatsapp_phone,
+                "I didn't recognize that plan type. Please select quick, moderate, or comprehensive."
+            );
+            return null;
+        }
+
+        // Find active session
+        $session = AssessmentSession::where('user_id', $user->id)
+            ->where('status', 'in_progress')
+            ->latest()
+            ->first();
+
+        if (!$session) {
+            // No active session, start a new one with the requested type
+            return $this->startNewAssessmentWithType($user, $newType);
+        }
+
+        // Don't transition if already using the requested type
+        if ($session->assessment_type === $newType) {
+            $this->sendTextMessage(
+                $user->whatsapp_phone,
+                "You're already using the {$newType} assessment type."
+            );
+            return $session;
+        }
+
+        // Call the existing transition method
+        return $this->transitionPlanType($session, $newType);
+    }
+
+    /**
+     * Start a new assessment with a specific type
+     */
+    private function startNewAssessmentWithType(User $user, string $type)
+    {
+        $session = new AssessmentSession();
+        $session->user_id = $user->id;
+        $session->current_phase = 0;
+        $session->current_question = 'assessment_type';
+        $session->responses = ['assessment_type' => $type];
+        $session->status = 'in_progress';
+        $session->started_at = now();
+        $session->save();
+
+        $this->loadAssessmentFlow($type);
+
+        // Update session to start actual assessment
+        $session->current_phase = 1;
+        $session->current_question = 'age';
+        $session->save();
+
+        $this->sendTextMessage(
+            $user->whatsapp_phone,
+            "Great! You selected *{$type}* assessment. Let's start with the first question."
+        );
+
+        // Ask first question
+        $this->askQuestion($user, 'age');
 
         return $session;
     }
@@ -756,12 +1532,69 @@ class WhatsAppService
      */
     private function processInteractiveMessage(User $user, array $content)
     {
+        Log::info('content', $content);
         $type = $content['type'] ?? null;
 
         if ($type === 'button_reply') {
             $buttonId = $content['button_reply']['id'] ?? null;
             $buttonText = $content['button_reply']['title'] ?? null;
 
+            // Otherwise, check for commands
+            $lowerContent = strtolower(trim($buttonText));
+
+            // Remove emojis and special characters
+            $lowerContent = preg_replace('/[^\p{L}\p{N}\s]/u', '', $lowerContent);
+
+            // First, check for standard commands
+            if ($lowerContent === 'start' || $lowerContent === 'begin' || $lowerContent === 'hi' || $lowerContent === 'hello') {
+                // Start new assessment
+                return $this->startAssessment($user);
+            } elseif ($lowerContent === 'help') {
+                return $this->sendHelpMessage($user);
+            } elseif ($lowerContent === 'plan' || $lowerContent === 'my plan') {
+                return $this->sendCurrentPlan($user);
+            } elseif ($lowerContent === 'progress') {
+                return $this->sendProgressUpdate($user);
+            } elseif (Str::startsWith($lowerContent, 'day ')) {
+                $day = trim(substr($lowerContent, 4));
+                return $this->sendDayMealPlan($user, $this->getCurrentDietPlan($user), $day);
+            }
+
+            // Check for grocery list commands
+            $groceryResponse = $this->groceryListService->processGroceryCommand($user, $lowerContent);
+            if ($groceryResponse !== null) {
+                $this->sendTextMessage($user->whatsapp_phone, $groceryResponse);
+                return null;
+            }
+
+            // Check for nutrition commands
+            $nutritionResponse = $this->nutritionInfoService->processNutritionCommand($user, $lowerContent);
+            if ($nutritionResponse !== null) {
+                $this->sendTextMessage($user->whatsapp_phone, $nutritionResponse);
+                return null;
+            }
+
+            // Check for progress tracking commands
+            $progressResponse = $this->getProgressTrackingService()->processProgressCommand($user, $lowerContent);
+            if ($progressResponse !== null) {
+                $this->sendTextMessage($user->whatsapp_phone, $progressResponse);
+                return null;
+            }
+
+            // Check for recipe commands
+            if (Str::startsWith($lowerContent, 'recipe ')) {
+                $params = explode(' ', substr($lowerContent, 7), 2);
+                if (count($params) == 2) {
+                    return $this->sendRecipe($user, $params[0], $params[1]);
+                }
+            }
+
+            // Check for calendar commands
+            if ($lowerContent === 'calendar sync' || $lowerContent === 'sync calendar') {
+                $syncResult = $this->getProgressTrackingService()->createCalendarEntries($user);
+                $this->sendTextMessage($user->whatsapp_phone, $syncResult);
+                return null;
+            }
             // Process button response
             $session = AssessmentSession::where('user_id', $user->id)
                 ->where('status', 'in_progress')
@@ -837,29 +1670,118 @@ class WhatsAppService
         return null;
     }
 
+    private function uploadMedia(string $filePath, string $mimeType)
+    {
+        try {
+            $response = Http::withToken($this->apiKey)
+                ->attach('file', file_get_contents($filePath), basename($filePath), ['Content-Type' => $mimeType])
+                ->post("{$this->apiUrl}/{$this->phoneNumberId}/media", [
+                    'messaging_product' => 'whatsapp',
+                    'type' => $mimeType
+                ]);
+
+            if ($response->successful()) {
+                return $response->json('id'); // Return the MEDIA_OBJECT_ID
+            } else {
+                Log::error('WhatsApp Media Upload Error', [
+                    'error' => $response->body(),
+                    'file_path' => $filePath
+                ]);
+                return false;
+            }
+        } catch (\Exception $e) {
+            Log::error('WhatsApp Media Upload Exception', [
+                'error' => $e->getMessage(),
+                'file_path' => $filePath
+            ]);
+            return false;
+        }
+    }
+
     /**
      * Send the diet plan summary to the user
      */
     private function sendDietPlanSummary(User $user, DietPlan $dietPlan)
     {
-        // Send summary message
-        $message = "🎉 *Your Diet Plan is Ready!* 🎉\n\n";
-        $message .= "*{$dietPlan->title}*\n";
-        $message .= "{$dietPlan->description}\n\n";
-        $message .= "Daily targets:\n";
-        $message .= "• Calories: *{$dietPlan->daily_calories}* kcal\n";
-        $message .= "• Protein: *{$dietPlan->protein_grams}g* ({$this->calculateMacroPercentage($dietPlan, 'protein')}%)\n";
-        $message .= "• Carbs: *{$dietPlan->carbs_grams}g* ({$this->calculateMacroPercentage($dietPlan, 'carbs')}%)\n";
-        $message .= "• Fats: *{$dietPlan->fats_grams}g* ({$this->calculateMacroPercentage($dietPlan, 'fats')}%)\n\n";
-        $message .= "I've created meal plans for every day of the week. Type 'plan' anytime to see your current plan or 'day' followed by the day (e.g., 'day monday') to see a specific day's meals.";
+        $mediaId = $this->uploadMedia(public_path('images/diet-plan-banner.jpg'), 'image/jpeg');
 
-        $this->sendTextMessage($user->whatsapp_phone, $message);
+        if ($mediaId) {
+            Log::info("Uploaded successfully! Media ID: $mediaId");
+        } else {
+            Log::info("Upload failed!");
+        }
+
+        if (!$mediaId) {
+            // Handle the error appropriately
+            $this->sendTextMessage($user->whatsapp_phone, "We're unable to load your diet plan image at the moment, but here's your plan:");
+        }
+
+        // Construct the interactive message payload
+        $interactive = [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'header' => [
+                    'type' => 'image',
+                    'image' => [
+                        'id' => $mediaId
+                    ]
+                ],
+                'body' => [
+                    'text' => "🎉 *Your Diet Plan is Ready!* 🎉\n\n" .
+                        "*{$dietPlan->title}*\n" .
+                        "{$dietPlan->description}\n\n" .
+                        "Daily targets:\n" .
+                        "• Calories: *{$dietPlan->daily_calories}* kcal\n" .
+                        "• Protein: *{$dietPlan->protein_grams}g* ({$this->calculateMacroPercentage($dietPlan, 'protein')}%)\n" .
+                        "• Carbs: *{$dietPlan->carbs_grams}g* ({$this->calculateMacroPercentage($dietPlan, 'carbs')}%)\n" .
+                        "• Fats: *{$dietPlan->fats_grams}g* ({$this->calculateMacroPercentage($dietPlan, 'fats')}%)\n\n" .
+                        "I've created meal plans for every day of the week. Type 'plan' anytime to see your current plan or 'day' followed by the day (e.g., 'day monday') to see a specific day's meals."
+                ],
+                'footer' => [
+                    'text' => "Need assistance? Type 'help' anytime."
+                ],
+                'action' => [
+                    'buttons' => [
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'view_plan',
+                                'title' => '📜 View Full Plan'
+                            ]
+                        ],
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'adjust_goal',
+                                'title' => '🎯 Adjust My Goal'
+                            ]
+                        ],
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'todays_meals',
+                                'title' => '🍽 Today’s Meals'
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        // Send the interactive message
+        $this->sendTextMessage($user->whatsapp_phone, '', $interactive);
 
         // Send first day's meal plan as an example
         $this->sendDayMealPlan($user, $dietPlan, 'monday');
 
         // Send follow-up schedule
-        $this->sendTextMessage($user->whatsapp_phone, "I'll check in with you:\n• Daily for quick status updates\n• Weekly for detailed assessments\n• Monthly for plan adjustments\n\nType 'help' anytime to see available commands.");
+        $followUpMessage = "I'll check in with you:\n" .
+            "• Daily for quick status updates\n" .
+            "• Weekly for detailed assessments\n" .
+            "• Monthly for plan adjustments\n\n" .
+            "Type 'help' anytime to see available commands.";
+        $this->sendTextMessage($user->whatsapp_phone, $followUpMessage);
     }
 
     /**
@@ -950,52 +1872,69 @@ class WhatsAppService
      */
     private function sendHelpMessage(User $user)
     {
-        $message = "🤖 *Available Commands* 🤖\n\n";
-        $message .= "• *start* - Begin a new assessment\n";
-        $message .= "• *plan* - View your current diet plan\n";
-        $message .= "• *day [day]* - View a specific day's meal plan (e.g., 'day monday')\n";
-        $message .= "• *recipe [meal] [day]* - View recipe for a specific meal (e.g., 'recipe breakfast monday')\n";
-        $message .= "• *progress* - View your progress\n";
-        $message .= "• *checkin* - Submit daily check-in\n";
-        $message .= "• *help* - Show this help message\n\n";
-        $message .= "Reply anytime with your question or concern, and I'll do my best to assist you!";
+        // Construct the interactive help message
+        $bodyText = "🤖 *Need Help? Use These Commands* 🤖\n\n" .
+            "🔹 *start* - Begin a new assessment\n" .
+            "🔹 *plan* - View your current diet plan\n" .
+            "🔹 *day [day]* - View a specific day's meal plan (e.g., 'day monday')\n" .
+            "🔹 *recipe [meal] [day]* - View recipe for a specific meal\n" .
+            "🔹 *progress* - View your progress\n" .
+            "🔹 *checkin* - Submit daily check-in\n\n" .
+            "📊 *Nutrition:* Get details about your meals\n\n" .
+            "🛒 *Grocery List:* Manage your shopping list\n\n" .
+            "📅 *Progress Tracking:* Log weight, meals, exercise, and water intake\n\n" .
+            "🎯 *Goal Tracking:* Set and update your goals\n\n" .
+            "🗓️ *Calendar:* Sync your meal plan to your calendar\n\n" .
+            "💬 Reply anytime with your question, and I'll assist you!";
 
-        // Nutrition commands
-        $message .= "*Nutrition:*\n";
-        $message .= "• *nutrition [meal] [day]* - Get detailed nutrition for a meal\n";
-        $message .= "• *macros [day]* - View macronutrient summary for a day\n";
-        $message .= "• *calories* - View your daily calorie target\n\n";
+        // Ensure text does not exceed 1024 characters
+        $maxLength = 1024;
+        $bodyText = mb_strimwidth($bodyText, 0, $maxLength, "...");
 
-        // Grocery list commands
-        $message .= "*Grocery List:*\n";
-        $message .= "• *grocery* - Show your current grocery list\n";
-        $message .= "• *bought [item]* - Mark an item as purchased\n";
-        $message .= "• *reset grocery* - Reset your grocery list\n\n";
+        $interactive = [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'header' => [
+                    'type' => 'image',
+                    'image' => [
+                        'id' => $this->helpMediaID
+                    ]
+                ],
+                'body' => [
+                    'text' => $bodyText
+                ],
+                'action' => [
+                    'buttons' => [
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'view_plan',
+                                'title' => '📜 View Plan'
+                            ]
+                        ],
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'track_progress',
+                                'title' => '📊 Track Progress'
+                            ]
+                        ],
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'grocery_list',
+                                'title' => '🛒 Grocery List'
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
 
-        // Progress tracking commands
-        $message .= "*Progress Tracking:*\n";
-        $message .= "• *checkin* - Start daily check-in process\n";
-        $message .= "• *progress* - View your progress report\n";
-        $message .= "• *weight [value]* - Log your current weight\n";
-        $message .= "• *water [amount]* - Log your water intake\n";
-        $message .= "• *meal done* - Mark a meal as completed\n";
-        $message .= "• *exercise done* - Log exercise completion\n\n";
-
-        // Goal tracking commands
-        $message .= "*Goal Tracking:*\n";
-        $message .= "• *goal* - View your active goals\n";
-        $message .= "• *goal new [description]* - Create a new goal\n";
-        $message .= "• *goal update [value]* - Update goal progress\n\n";
-
-        // Calendar commands
-        $message .= "*Calendar:*\n";
-        $message .= "• *calendar sync* - Sync meal plan to calendar\n\n";
-
-        $message .= "Reply anytime with your question or concern, and I'll do my best to assist you!";
-
-        $this->sendTextMessage($user->whatsapp_phone, $message);
-
+        $this->sendTextMessage($user->whatsapp_phone, '', $interactive);
     }
+
 
     /**
      * Send current plan to user
@@ -1152,8 +2091,16 @@ class WhatsAppService
             ];
 
             if ($interactive) {
-                $payload = array_merge($payload, $interactive); // Merging interactive message data
+                $payload = array_merge($payload, $interactive);
+                // Ensure interactive message has a valid body text
+                if (!isset($payload['interactive']['body']['text']) || empty(trim($payload['interactive']['body']['text']))) {
+                    $payload['interactive']['body']['text'] = "📌 Here are your available commands:";
+                }
             } else {
+                // Ensure message is not empty and does not exceed 1024 characters
+                $maxLength = 1024;
+                $message = mb_strimwidth($message ?: "📌 No message content provided.", 0, $maxLength, "...");
+
                 $payload['type'] = 'text';
                 $payload['text'] = [
                     'preview_url' => false,
@@ -1167,12 +2114,11 @@ class WhatsAppService
             if (!$response->successful()) {
                 Log::error('WhatsApp API error', [
                     'error' => $response->body(),
+                    'payload' => $payload,
                     'to' => $to
                 ]);
-
                 return false;
             }
-
             // Find user
             $user = User::where('whatsapp_phone', $to)->first();
 
@@ -1192,7 +2138,6 @@ class WhatsAppService
                 'error' => $e->getMessage(),
                 'to' => $to
             ]);
-
             return false;
         }
     }

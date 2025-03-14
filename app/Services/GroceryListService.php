@@ -536,6 +536,8 @@ class GroceryListService
             case 'grocery':
                 return $this->handleGroceryListRequest($user, $parameter);
 
+            case 'grocery list':
+                    return $this->handleGroceryListRequest($user, $parameter);
             case 'bought':
             case 'purchased':
                 return $this->handleMarkAsPurchased($user, $parameter);
