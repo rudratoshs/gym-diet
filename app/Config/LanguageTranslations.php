@@ -462,6 +462,16 @@ class LanguageTranslations
             'home_cooking' => 'Home-cooked meals',
             'no_specific_prefs' => 'No specific preference',
 
+            // Meal Portion Size
+            'meal_portion_size_prompt' => 'What is your preferred meal portion size?',
+            'meal_portion_size_header' => 'Meal Portion Size',
+            'meal_portion_size_body' => 'Select your preferred portion size',
+            'small_portion' => 'Small portion',
+            'medium_portion' => 'Medium portion',
+            'large_portion' => 'Large portion',
+            'variable_portion' => 'Varies per meal',
+            'not_sure_portion' => 'Not sure',
+
             // Daily schedule
             'schedule_prompt' => 'Your typical daily schedule?',
             'schedule_header' => 'Daily Schedule',

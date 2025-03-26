@@ -375,6 +375,5 @@ class ModerateAssessmentQuestions
             ]
         ];
 
-        return $moderateQuestions;
-    }
+        return array_merge($quickQuestions, $moderateQuestions);    }
 }

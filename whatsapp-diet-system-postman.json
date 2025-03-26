@@ -1,1602 +1,2656 @@
 {
-	"info": {
-		"_postman_id": "b8f7f3e2-d8a7-4d8e-9c71-f9c19c5a3b2e",
-		"name": "WhatsApp Diet System API",
-		"description": "API collection for the WhatsApp Diet Planning System",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-	},
-	"item": [
+    "info": {
+        "_postman_id": "b8f7f3e2-d8a7-4d8e-9c71-f9c19c5a3b2e",
+        "name": "WhatsApp Diet System API",
+        "description": "API collection for the WhatsApp Diet Planning System",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Authentication",
+            "item": [
+                {
+                    "name": "Register",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Test User\",\n    \"email\": \"testuser@example.com\",\n    \"password\": \"password\",\n    \"password_confirmation\": \"password\",\n    \"phone\": \"1234567890\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/register",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "auth", "register"]
+                        },
+                        "description": "Register a new user"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "var jsonData = pm.response.json();",
+                                    "if (jsonData && jsonData.token) {",
+                                    "    pm.environment.set('auth_token', jsonData.token);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"admin@example.com\",\n    \"password\": \"password\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/login",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "auth", "login"]
+                        },
+                        "description": "Login with admin credentials"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Login (Client)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "var jsonData = pm.response.json();",
+                                    "if (jsonData && jsonData.token) {",
+                                    "    pm.environment.set('client_token', jsonData.token);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"client@example.com\",\n    \"password\": \"password\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/login",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "auth", "login"]
+                        },
+                        "description": "Login with client credentials"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Login (Trainer)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "var jsonData = pm.response.json();",
+                                    "if (jsonData && jsonData.token) {",
+                                    "    pm.environment.set('trainer_token', jsonData.token);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"trainer@example.com\",\n    \"password\": \"password\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/login",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "auth", "login"]
+                        },
+                        "description": "Login with trainer credentials"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Current User",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/me",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "auth", "me"]
+                        },
+                        "description": "Get current authenticated user info"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/logout",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "auth", "logout"]
+                        },
+                        "description": "Logout user and invalidate token"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Authentication-related endpoints"
+        },
+        {
+            "name": "Users",
+            "item": [
+                {
+                    "name": "List Users",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users?role=client&status=active&search=",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users"],
+                            "query": [
+                                {
+                                    "key": "role",
+                                    "value": "client",
+                                    "description": "Filter by role (admin, gym_admin, trainer, dietitian, client)"
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "active",
+                                    "description": "Filter by status (active, inactive, pending)"
+                                },
+                                {
+                                    "key": "search",
+                                    "value": "",
+                                    "description": "Search by name or email"
+                                }
+                            ]
+                        },
+                        "description": "Get list of users with optional filters"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create User",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"New Client\",\n    \"email\": \"new.client@example.com\",\n    \"password\": \"password\",\n    \"phone\": \"9876543210\",\n    \"whatsapp_phone\": \"9876543210\",\n    \"status\": \"active\",\n    \"role\": \"client\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users"]
+                        },
+                        "description": "Create a new user"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get User",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users/3",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users", "3"]
+                        },
+                        "description": "Get user by ID"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update User",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Updated Client Name\",\n    \"phone\": \"9876543210\",\n    \"status\": \"active\",\n    \"role\": \"client\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users/3",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users", "3"]
+                        },
+                        "description": "Update user by ID"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete User",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users/5",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users", "5"]
+                        },
+                        "description": "Delete user by ID"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Roles",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/roles",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "roles"]
+                        },
+                        "description": "Get list of available roles"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "User management endpoints"
+        },
+        {
+            "name": "Gyms",
+            "item": [
+                {
+                    "name": "List Gyms",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms"]
+                        },
+                        "description": "Get list of gyms"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Gym",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Power Fitness Gym\",\n    \"address\": \"123 Main Street, City, Country\",\n    \"phone\": \"1234567890\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms"]
+                        },
+                        "description": "Create a new gym"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Gym",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms", "1"]
+                        },
+                        "description": "Get gym by ID"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Gym",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Updated Gym Name\",\n    \"address\": \"Updated Address\",\n    \"phone\": \"9876543210\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms", "1"]
+                        },
+                        "description": "Update gym by ID"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Gym",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/2",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms", "2"]
+                        },
+                        "description": "Delete gym by ID"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Gym Users",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1/users?role=client&status=active",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms", "1", "users"],
+                            "query": [
+                                {
+                                    "key": "role",
+                                    "value": "client",
+                                    "description": "Filter by role (gym_admin, trainer, dietitian, client)"
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "active",
+                                    "description": "Filter by status (active, inactive)"
+                                }
+                            ]
+                        },
+                        "description": "Get list of users in a gym with optional filters"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Add User to Gym",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"user_id\": 3,\n    \"role\": \"client\",\n    \"status\": \"active\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1/users",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms", "1", "users"]
+                        },
+                        "description": "Add user to gym"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove User from Gym",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1/users/3",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms", "1", "users", "3"]
+                        },
+                        "description": "Remove user from gym"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Gym management endpoints"
+        },
+        {
+            "name": "Client Profiles",
+            "item": [
+                {
+                    "name": "Get Client Profile",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users/3/profile",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users", "3", "profile"]
+                        },
+                        "description": "Get client profile by user ID"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create/Update Client Profile",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"age\": 30,\n    \"gender\": \"male\",\n    \"height\": 175,\n    \"current_weight\": 80,\n    \"target_weight\": 75,\n    \"activity_level\": \"moderately_active\",\n    \"diet_type\": \"vegetarian\",\n    \"health_conditions\": [\"none\"],\n    \"allergies\": [\"dairy\"],\n    \"recovery_needs\": [\"weight_loss\"],\n    \"meal_preferences\": [\"high_protein\", \"low_carb\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users/3/profile",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users", "3", "profile"]
+                        },
+                        "description": "Create or update client profile"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Client Profile",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"current_weight\": 78,\n    \"target_weight\": 72,\n    \"activity_level\": \"very_active\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users/3/profile",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users", "3", "profile"]
+                        },
+                        "description": "Update client profile"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Client profile management endpoints"
+        },
+        {
+            "name": "Diet Plans",
+            "item": [
+                {
+                    "name": "List Diet Plans",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans?client_id=&status=active",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "diet-plans"],
+                            "query": [
+                                {
+                                    "key": "client_id",
+                                    "value": "",
+                                    "description": "Filter by client ID"
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "active",
+                                    "description": "Filter by status (active, inactive, completed)"
+                                }
+                            ]
+                        },
+                        "description": "Get list of diet plans with optional filters"
+                    }
+                },
+                {
+                    "name": "Create Diet Plan",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"client_id\": 3,\n    \"title\": \"Weight Loss & Detox Plan\",\n    \"description\": \"A balanced diet plan designed for weight loss and liver detoxification\",\n    \"daily_calories\": 2200,\n    \"protein_grams\": 165,\n    \"carbs_grams\": 248,\n    \"fats_grams\": 61,\n    \"status\": \"active\",\n    \"start_date\": \"2025-03-01\",\n    \"end_date\": \"2025-03-31\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "diet-plans"]
+                        },
+                        "description": "Create a new diet plan"
+                    }
+                },
+                {
+                    "name": "Get Diet Plan",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "diet-plans", "1"]
+                        },
+                        "description": "Get diet plan by ID"
+                    }
+                },
+                {
+                    "name": "Update Diet Plan",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"title\": \"Updated Weight Loss Plan\",\n    \"description\": \"Updated description for the diet plan\",\n    \"daily_calories\": 2000,\n    \"protein_grams\": 150,\n    \"carbs_grams\": 225,\n    \"fats_grams\": 55,\n    \"status\": \"active\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "diet-plans", "1"]
+                        },
+                        "description": "Update diet plan by ID"
+                    }
+                },
+                {
+                    "name": "Delete Diet Plan",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "diet-plans", "1"]
+                        },
+                        "description": "Delete diet plan by ID"
+                    }
+                },
+                {
+                    "name": "Get Diet Plan Meal Plans",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1/meal-plans",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "diet-plans", "1", "meal-plans"]
+                        },
+                        "description": "Get meal plans for a diet plan"
+                    }
+                },
+                {
+                    "name": "Duplicate Diet Plan",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"new_title\": \"Duplicated Diet Plan\",\n    \"client_id\": 3,\n    \"start_date\": \"2025-04-01\",\n    \"end_date\": \"2025-04-30\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1/duplicate",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "diet-plans", "1", "duplicate"]
+                        },
+                        "description": "Duplicate an existing diet plan"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Meal Plans",
+            "item": [
+                {
+                    "name": "Create Meal Plan",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"day_of_week\": \"monday\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1/meal-plans",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "diet-plans", "1", "meal-plans"]
+                        },
+                        "description": "Create a new meal plan for a diet plan"
+                    }
+                },
+                {
+                    "name": "Get Meal Plan",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1/meal-plans/1",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "api",
+                                "diet-plans",
+                                "1",
+                                "meal-plans",
+                                "1"
+                            ]
+                        },
+                        "description": "Get meal plan by ID"
+                    }
+                },
+                {
+                    "name": "Delete Meal Plan",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1/meal-plans/1",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "api",
+                                "diet-plans",
+                                "1",
+                                "meal-plans",
+                                "1"
+                            ]
+                        },
+                        "description": "Delete meal plan by ID"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Meals",
+            "item": [
+                {
+                    "name": "Create Meal",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"meal_type\": \"breakfast\",\n    \"title\": \"Spinach and Mushroom Omelette with Whole Grain Toast\",\n    \"description\": \"A protein-rich breakfast with egg whites, spinach, mushrooms, and spices. Served with whole grain toast.\",\n    \"calories\": 350,\n    \"protein_grams\": 25,\n    \"carbs_grams\": 35,\n    \"fats_grams\": 12,\n    \"time_of_day\": \"08:00:00\",\n    \"recipes\": {\n        \"ingredients\": [\n            \"3 egg whites\",\n            \"1 whole egg\",\n            \"1 cup fresh spinach, chopped\",\n            \"1/2 cup mushrooms, sliced\",\n            \"1 small onion, finely diced\",\n            \"1 tsp olive oil\",\n            \"1/4 tsp turmeric powder\",\n            \"1/4 tsp black pepper\",\n            \"Salt to taste\",\n            \"1 slice whole grain bread\"\n        ],\n        \"instructions\": [\n            \"Heat olive oil in a non-stick pan over medium heat\",\n            \"Sauté onions until translucent, about 2 minutes\",\n            \"Add mushrooms and cook until soft, about 3 minutes\",\n            \"Add spinach and cook until wilted, about 1 minute\",\n            \"Beat eggs in a bowl with turmeric, black pepper, and salt\",\n            \"Pour egg mixture over vegetables and cook until set\",\n            \"Fold omelette in half and cook for another minute\",\n            \"Toast the whole grain bread and serve alongside the omelette\"\n        ]\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/meals",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "api",
+                                "diet-plans",
+                                "1",
+                                "meal-plans",
+                                "1",
+                                "meals"
+                            ]
+                        },
+                        "description": "Create a new meal for a meal plan"
+                    }
+                },
+                {
+                    "name": "Get Meal",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/meals/1",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "api",
+                                "diet-plans",
+                                "1",
+                                "meal-plans",
+                                "1",
+                                "meals",
+                                "1"
+                            ]
+                        },
+                        "description": "Get meal by ID"
+                    }
+                },
+                {
+                    "name": "Update Meal",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"title\": \"Updated Breakfast\",\n    \"description\": \"Updated description for the breakfast meal\",\n    \"calories\": 300,\n    \"protein_grams\": 20,\n    \"carbs_grams\": 30,\n    \"fats_grams\": 10,\n    \"time_of_day\": \"07:30:00\",\n    \"recipes\": {\n        \"ingredients\": [\n            \"Updated ingredients list\"\n        ],\n        \"instructions\": [\n            \"Updated cooking instructions\"\n        ]\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/meals/1",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "api",
+                                "diet-plans",
+                                "1",
+                                "meal-plans",
+                                "1",
+                                "meals",
+                                "1"
+                            ]
+                        },
+                        "description": "Update meal by ID"
+                    }
+                },
+                {
+                    "name": "Delete Meal",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/meals/1",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "api",
+                                "diet-plans",
+                                "1",
+                                "meal-plans",
+                                "1",
+                                "meals",
+                                "1"
+                            ]
+                        },
+                        "description": "Delete meal by ID"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Assessments",
+            "item": [
+                {
+                    "name": "Start Assessment",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"assessment_type\": \"diet\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users/3/assessments",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users", "3", "assessments"]
+                        },
+                        "description": "Start a new assessment for a user"
+                    }
+                },
+                {
+                    "name": "Get Assessment",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/assessments/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "assessments", "1"]
+                        },
+                        "description": "Get assessment by ID"
+                    }
+                },
+                {
+                    "name": "Update Assessment",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"current_phase\": 2,\n    \"current_question\": \"health_conditions\",\n    \"responses\": {\n        \"age\": 33,\n        \"gender\": \"male\",\n        \"height\": 180,\n        \"current_weight\": 70,\n        \"target_weight\": 65,\n        \"activity_level\": \"lightly_active\"\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/assessments/1",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "assessments", "1"]
+                        },
+                        "description": "Update assessment progress"
+                    }
+                },
+                {
+                    "name": "Complete Assessment",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"final_responses\": {\n        \"plan_type\": \"complete\"\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/assessments/1/complete",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "assessments", "1", "complete"]
+                        },
+                        "description": "Mark assessment as complete and trigger plan creation"
+                    }
+                },
+                {
+                    "name": "Get Assessment Result",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/assessments/1/result",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "assessments", "1", "result"]
+                        },
+                        "description": "Get the result of a completed assessment"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "AI Configuration",
+            "item": [
+                {
+                    "name": "List AI Configurations",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1/ai-configurations",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms", "1", "ai-configurations"]
+                        },
+                        "description": "List AI configurations for a gym"
+                    }
+                },
+                {
+                    "name": "Create AI Configuration",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"OpenAI GPT-4\",\n    \"provider\": \"openai\",\n    \"model\": \"gpt-4\",\n    \"api_key\": \"your-api-key-here\",\n    \"settings\": {\n        \"temperature\": 0.7,\n        \"max_tokens\": 4000,\n        \"top_p\": 1.0\n    },\n    \"is_default\": true,\n    \"status\": \"active\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1/ai-configurations",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "gyms", "1", "ai-configurations"]
+                        },
+                        "description": "Create a new AI configuration for a gym"
+                    }
+                },
+                {
+                    "name": "Update AI Configuration",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Updated OpenAI Config\",\n    \"model\": \"gpt-4-turbo\",\n    \"settings\": {\n        \"temperature\": 0.5,\n        \"max_tokens\": 8000\n    },\n    \"status\": \"active\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1/ai-configurations/1",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "api",
+                                "gyms",
+                                "1",
+                                "ai-configurations",
+                                "1"
+                            ]
+                        },
+                        "description": "Update an AI configuration"
+                    }
+                },
+                {
+                    "name": "Delete AI Configuration",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1/ai-configurations/1",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "api",
+                                "gyms",
+                                "1",
+                                "ai-configurations",
+                                "1"
+                            ]
+                        },
+                        "description": "Delete an AI configuration"
+                    }
+                },
+                {
+                    "name": "Test AI Configuration",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{auth_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"prompt\": \"Create a sample breakfast recipe for weight loss\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/gyms/1/ai-configurations/1/test",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "api",
+                                "gyms",
+                                "1",
+                                "ai-configurations",
+                                "1",
+                                "test"
+                            ]
+                        },
+                        "description": "Test an AI configuration with a sample prompt"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Subscriptions",
+            "item": [
+                {
+                    "name": "Platform Subscription Plans",
+                    "item": [
+                        {
+                            "name": "List Subscription Plans",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/subscription-plans",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "subscription-plans"]
+                                },
+                                "description": "Get list of platform subscription plans (admin only)"
+                            }
+                        },
+                        {
+                            "name": "Get Public Subscription Plans",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/public-subscription-plans",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "public-subscription-plans"]
+                                },
+                                "description": "Get list of publicly available subscription plans"
+                            }
+                        },
+                        {
+                            "name": "Create Subscription Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Starter Plan\",\n    \"code\": \"starter\",\n    \"description\": \"Basic plan for small gyms with up to 50 clients.\",\n    \"monthly_price\": 49.99,\n    \"quarterly_price\": 134.97,\n    \"annual_price\": 479.90,\n    \"features\": {\n        \"max_clients\": 50,\n        \"max_diet_plans\": 2,\n        \"ai_meal_generation\": true,\n        \"ai_meal_generation_limit\": 50\n    },\n    \"is_active\": true\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/subscription-plans",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "subscription-plans"]
+                                },
+                                "description": "Create a new subscription plan (admin only)"
+                            }
+                        },
+                        {
+                            "name": "Get Subscription Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/subscription-plans/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "subscription-plans", "1"]
+                                },
+                                "description": "Get subscription plan details"
+                            }
+                        },
+                        {
+                            "name": "Update Subscription Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Updated Starter Plan\",\n    \"monthly_price\": 59.99,\n    \"features\": {\n        \"max_clients\": 75,\n        \"max_diet_plans\": 3,\n        \"ai_meal_generation\": true,\n        \"ai_meal_generation_limit\": 100\n    }\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/subscription-plans/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "subscription-plans", "1"]
+                                },
+                                "description": "Update subscription plan details (admin only)"
+                            }
+                        },
+                        {
+                            "name": "Delete Subscription Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/subscription-plans/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "subscription-plans", "1"]
+                                },
+                                "description": "Delete subscription plan (admin only)"
+                            }
+                        }
+                    ],
+                    "description": "Platform subscription plan management"
+                },
+                {
+                    "name": "Gym Subscriptions",
+                    "item": [
+                        {
+                            "name": "Get Gym Subscription",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/subscription",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "gyms", "1", "subscription"]
+                                },
+                                "description": "Get gym's active subscription"
+                            }
+                        },
+                        {
+                            "name": "Subscribe Gym to Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"plan_id\": 1,\n    \"billing_cycle\": \"monthly\",\n    \"payment_provider\": \"stripe\",\n    \"payment_method_id\": \"pm_test_stripe_payment_method\",\n    \"payment_data\": {}\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/subscribe",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "gyms", "1", "subscribe"]
+                                },
+                                "description": "Subscribe gym to a platform plan"
+                            }
+                        },
+                        {
+                            "name": "Update Gym Subscription",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"plan_id\": 2,\n    \"payment_method_id\": \"pm_new_payment_method\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/subscription",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "gyms", "1", "subscription"]
+                                },
+                                "description": "Update gym's subscription plan or payment method"
+                            }
+                        },
+                        {
+                            "name": "Cancel Gym Subscription",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"at_period_end\": true\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/subscription/cancel",
+                                    "host": ["{{base_url}}"],
+                                    "path": [
+                                        "api",
+                                        "gyms",
+                                        "1",
+                                        "subscription",
+                                        "cancel"
+                                    ]
+                                },
+                                "description": "Cancel gym's subscription"
+                            }
+                        }
+                    ],
+                    "description": "Gym subscription management"
+                },
+                {
+                    "name": "Gym Subscription Plans",
+                    "item": [
+                        {
+                            "name": "List Gym Subscription Plans",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/subscription-plans?active=true",
+                                    "host": ["{{base_url}}"],
+                                    "path": [
+                                        "api",
+                                        "gyms",
+                                        "1",
+                                        "subscription-plans"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "active",
+                                            "value": "true",
+                                            "description": "Filter by active status"
+                                        }
+                                    ]
+                                },
+                                "description": "Get list of gym's subscription plans for clients"
+                            }
+                        },
+                        {
+                            "name": "Get Public Gym Plans",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/public-subscription-plans",
+                                    "host": ["{{base_url}}"],
+                                    "path": [
+                                        "api",
+                                        "gyms",
+                                        "1",
+                                        "public-subscription-plans"
+                                    ]
+                                },
+                                "description": "Get list of publicly available gym subscription plans for clients"
+                            }
+                        },
+                        {
+                            "name": "Create Gym Subscription Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Basic Client Plan\",\n    \"description\": \"Basic subscription plan for gym clients\",\n    \"price\": 29.99,\n    \"billing_cycle\": \"monthly\",\n    \"features\": {\n        \"personal_training\": false,\n        \"diet_plans\": true,\n        \"unlimited_workouts\": false\n    },\n    \"is_active\": true\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/subscription-plans",
+                                    "host": ["{{base_url}}"],
+                                    "path": [
+                                        "api",
+                                        "gyms",
+                                        "1",
+                                        "subscription-plans"
+                                    ]
+                                },
+                                "description": "Create a new gym subscription plan for clients"
+                            }
+                        },
+                        {
+                            "name": "Get Gym Subscription Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/subscription-plans/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": [
+                                        "api",
+                                        "gyms",
+                                        "1",
+                                        "subscription-plans",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Get gym subscription plan details"
+                            }
+                        },
+                        {
+                            "name": "Update Gym Subscription Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Updated Basic Client Plan\",\n    \"price\": 34.99,\n    \"features\": {\n        \"personal_training\": true,\n        \"diet_plans\": true,\n        \"unlimited_workouts\": false\n    }\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/subscription-plans/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": [
+                                        "api",
+                                        "gyms",
+                                        "1",
+                                        "subscription-plans",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Update gym subscription plan details"
+                            }
+                        },
+                        {
+                            "name": "Delete Gym Subscription Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/gyms/1/subscription-plans/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": [
+                                        "api",
+                                        "gyms",
+                                        "1",
+                                        "subscription-plans",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Delete gym subscription plan"
+                            }
+                        }
+                    ],
+                    "description": "Gym subscription plan management for clients"
+                },
+                {
+                    "name": "Client Subscriptions",
+                    "item": [
+                        {
+                            "name": "List Client Subscriptions",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/client-subscriptions?gym_id=1&status=active",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "client-subscriptions"],
+                                    "query": [
+                                        {
+                                            "key": "gym_id",
+                                            "value": "1",
+                                            "description": "Filter by gym ID"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "active",
+                                            "description": "Filter by status"
+                                        }
+                                    ]
+                                },
+                                "description": "Get list of client subscriptions"
+                            }
+                        },
+                        {
+                            "name": "Create Client Subscription",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"user_id\": 3,\n    \"gym_id\": 1,\n    \"gym_subscription_plan_id\": 1,\n    \"status\": \"active\",\n    \"start_date\": \"2025-03-01\",\n    \"auto_renew\": true,\n    \"payment_status\": \"paid\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/client-subscriptions",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "client-subscriptions"]
+                                },
+                                "description": "Create a new client subscription"
+                            }
+                        },
+                        {
+                            "name": "Get Client Subscription",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/client-subscriptions/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "client-subscriptions", "1"]
+                                },
+                                "description": "Get client subscription details"
+                            }
+                        },
+                        {
+                            "name": "Update Client Subscription",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"active\",\n    \"end_date\": \"2025-06-01\",\n    \"auto_renew\": false,\n    \"payment_status\": \"paid\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/client-subscriptions/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "client-subscriptions", "1"]
+                                },
+                                "description": "Update client subscription details"
+                            }
+                        },
+                        {
+                            "name": "Delete Client Subscription",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/client-subscriptions/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "client-subscriptions", "1"]
+                                },
+                                "description": "Delete client subscription"
+                            }
+                        },
+                        {
+                            "name": "Subscribe User to Gym Plan",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"gym_id\": 1,\n    \"gym_subscription_plan_id\": 1,\n    \"auto_renew\": true,\n    \"payment_status\": \"paid\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/users/3/subscribe",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "users", "3", "subscribe"]
+                                },
+                                "description": "Subscribe a user to a gym subscription plan"
+                            }
+                        }
+                    ],
+                    "description": "Client subscription management"
+                },
+                {
+                    "name": "AI Meal Generation",
+                    "item": [
+                        {
+                            "name": "Generate Meals with AI",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{auth_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/generate-ai",
+                                    "host": ["{{base_url}}"],
+                                    "path": [
+                                        "api",
+                                        "diet-plans",
+                                        "1",
+                                        "meal-plans",
+                                        "1",
+                                        "generate-ai"
+                                    ]
+                                },
+                                "description": "Generate meals for a meal plan using AI (subscription required)"
+                            }
+                        }
+                    ],
+                    "description": "AI-based meal generation with subscription feature checks"
+                }
+            ],
+            "description": "Subscription management and feature access"
+        },
 		{
-			"name": "Authentication",
+			"name": "Web Assessment",
 			"item": [
 				{
-					"name": "Register",
+					"name": "Get Assessment Status",
 					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Test User\",\n    \"email\": \"testuser@example.com\",\n    \"password\": \"password\",\n    \"password_confirmation\": \"password\",\n    \"phone\": \"1234567890\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/auth/register",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"auth",
-								"register"
-							]
-						},
-						"description": "Register a new user"
-					},
-					"response": []
-				},
-				{
-					"name": "Login",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData && jsonData.token) {",
-									"    pm.environment.set('auth_token', jsonData.token);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"admin@example.com\",\n    \"password\": \"password\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/auth/login",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"auth",
-								"login"
-							]
-						},
-						"description": "Login with admin credentials"
-					},
-					"response": []
-				},
-				{
-					"name": "Login (Client)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData && jsonData.token) {",
-									"    pm.environment.set('client_token', jsonData.token);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"client@example.com\",\n    \"password\": \"password\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/auth/login",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"auth",
-								"login"
-							]
-						},
-						"description": "Login with client credentials"
-					},
-					"response": []
-				},
-				{
-					"name": "Login (Trainer)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData && jsonData.token) {",
-									"    pm.environment.set('trainer_token', jsonData.token);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"trainer@example.com\",\n    \"password\": \"password\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/auth/login",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"auth",
-								"login"
-							]
-						},
-						"description": "Login with trainer credentials"
-					},
-					"response": []
-				},
-				{
-					"name": "Current User",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
 						"method": "GET",
 						"header": [
 							{
 								"key": "Accept",
 								"value": "application/json",
 								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/auth/me",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"auth",
-								"me"
-							]
-						},
-						"description": "Get current authenticated user info"
-					},
-					"response": []
-				},
-				{
-					"name": "Logout",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/auth/logout",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"auth",
-								"logout"
-							]
-						},
-						"description": "Logout user and invalidate token"
-					},
-					"response": []
-				}
-			],
-			"description": "Authentication-related endpoints"
-		},
-		{
-			"name": "Users",
-			"item": [
-				{
-					"name": "List Users",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/users?role=client&status=active&search=",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users"
-							],
-							"query": [
-								{
-									"key": "role",
-									"value": "client",
-									"description": "Filter by role (admin, gym_admin, trainer, dietitian, client)"
-								},
-								{
-									"key": "status",
-									"value": "active",
-									"description": "Filter by status (active, inactive, pending)"
-								},
-								{
-									"key": "search",
-									"value": "",
-									"description": "Search by name or email"
-								}
-							]
-						},
-						"description": "Get list of users with optional filters"
-					},
-					"response": []
-				},
-				{
-					"name": "Create User",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
 							},
 							{
-								"key": "Content-Type",
-								"value": "application/json",
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
 								"type": "text"
 							}
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"New Client\",\n    \"email\": \"new.client@example.com\",\n    \"password\": \"password\",\n    \"phone\": \"9876543210\",\n    \"whatsapp_phone\": \"9876543210\",\n    \"status\": \"active\",\n    \"role\": \"client\"\n}"
-						},
 						"url": {
-							"raw": "{{base_url}}/api/users",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users"
-							]
+							"raw": "{{base_url}}/api/web-assessment/status",
+							"host": ["{{base_url}}"],
+							"path": ["api", "web-assessment", "status"]
 						},
-						"description": "Create a new user"
+						"description": "Get the current assessment status for the authenticated user"
 					},
 					"response": []
 				},
-				{
-					"name": "Get User",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/users/3",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"3"
-							]
-						},
-						"description": "Get user by ID"
-					},
-					"response": []
-				},
-				{
-					"name": "Update User",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Updated Client Name\",\n    \"phone\": \"9876543210\",\n    \"status\": \"active\",\n    \"role\": \"client\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/users/3",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"3"
-							]
-						},
-						"description": "Update user by ID"
-					},
-					"response": []
-				},
-				{
-					"name": "Delete User",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/users/5",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"5"
-							]
-						},
-						"description": "Delete user by ID"
-					},
-					"response": []
-				},
-				{
-					"name": "Get Roles",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/roles",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"roles"
-							]
-						},
-						"description": "Get list of available roles"
-					},
-					"response": []
-				}
-			],
-			"description": "User management endpoints"
-		},
-		{
-			"name": "Gyms",
-			"item": [
-				{
-					"name": "List Gyms",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/gyms",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms"
-							]
-						},
-						"description": "Get list of gyms"
-					},
-					"response": []
-				},
-				{
-					"name": "Create Gym",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Power Fitness Gym\",\n    \"address\": \"123 Main Street, City, Country\",\n    \"phone\": \"1234567890\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/gyms",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms"
-							]
-						},
-						"description": "Create a new gym"
-					},
-					"response": []
-				},
-				{
-					"name": "Get Gym",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1"
-							]
-						},
-						"description": "Get gym by ID"
-					},
-					"response": []
-				},
-				{
-					"name": "Update Gym",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Updated Gym Name\",\n    \"address\": \"Updated Address\",\n    \"phone\": \"9876543210\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1"
-							]
-						},
-						"description": "Update gym by ID"
-					},
-					"response": []
-				},
-				{
-					"name": "Delete Gym",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/gyms/2",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"2"
-							]
-						},
-						"description": "Delete gym by ID"
-					},
-					"response": []
-				},
-				{
-					"name": "List Gym Users",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1/users?role=client&status=active",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1",
-								"users"
-							],
-							"query": [
-								{
-									"key": "role",
-									"value": "client",
-									"description": "Filter by role (gym_admin, trainer, dietitian, client)"
-								},
-								{
-									"key": "status",
-									"value": "active",
-									"description": "Filter by status (active, inactive)"
-								}
-							]
-						},
-						"description": "Get list of users in a gym with optional filters"
-					},
-					"response": []
-				},
-				{
-					"name": "Add User to Gym",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"user_id\": 3,\n    \"role\": \"client\",\n    \"status\": \"active\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1/users",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1",
-								"users"
-							]
-						},
-						"description": "Add user to gym"
-					},
-					"response": []
-				},
-				{
-					"name": "Remove User from Gym",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1/users/3",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1",
-								"users",
-								"3"
-							]
-						},
-						"description": "Remove user from gym"
-					},
-					"response": []
-				}
-			],
-			"description": "Gym management endpoints"
-		},
-		{
-			"name": "Client Profiles",
-			"item": [
-				{
-					"name": "Get Client Profile",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/users/3/profile",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"3",
-								"profile"
-							]
-						},
-						"description": "Get client profile by user ID"
-					},
-					"response": []
-				},
-				{
-					"name": "Create/Update Client Profile",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"age\": 30,\n    \"gender\": \"male\",\n    \"height\": 175,\n    \"current_weight\": 80,\n    \"target_weight\": 75,\n    \"activity_level\": \"moderately_active\",\n    \"diet_type\": \"vegetarian\",\n    \"health_conditions\": [\"none\"],\n    \"allergies\": [\"dairy\"],\n    \"recovery_needs\": [\"weight_loss\"],\n    \"meal_preferences\": [\"high_protein\", \"low_carb\"]\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/users/3/profile",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"3",
-								"profile"
-							]
-						},
-						"description": "Create or update client profile"
-					},
-					"response": []
-				},
-				{
-					"name": "Update Client Profile",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"current_weight\": 78,\n    \"target_weight\": 72,\n    \"activity_level\": \"very_active\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/users/3/profile",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"3",
-								"profile"
-							]
-						},
-						"description": "Update client profile"
-					},
-					"response": []
-				}
-			],
-			"description": "Client profile management endpoints"
-		},
-		{
-			"name": "Diet Plans",
-			"item": [
-				{
-					"name": "List Diet Plans",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans?client_id=&status=active",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans"
-							],
-							"query": [
-								{
-									"key": "client_id",
-									"value": "",
-									"description": "Filter by client ID"
-								},
-								{
-									"key": "status",
-									"value": "active",
-									"description": "Filter by status (active, inactive, completed)"
-								}
-							]
-						},
-						"description": "Get list of diet plans with optional filters"
-					}
-				},
-				{
-					"name": "Create Diet Plan",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"client_id\": 3,\n    \"title\": \"Weight Loss & Detox Plan\",\n    \"description\": \"A balanced diet plan designed for weight loss and liver detoxification\",\n    \"daily_calories\": 2200,\n    \"protein_grams\": 165,\n    \"carbs_grams\": 248,\n    \"fats_grams\": 61,\n    \"status\": \"active\",\n    \"start_date\": \"2025-03-01\",\n    \"end_date\": \"2025-03-31\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans"
-							]
-						},
-						"description": "Create a new diet plan"
-					}
-				},
-				{
-					"name": "Get Diet Plan",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1"
-							]
-						},
-						"description": "Get diet plan by ID"
-					}
-				},
-				{
-					"name": "Update Diet Plan",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"title\": \"Updated Weight Loss Plan\",\n    \"description\": \"Updated description for the diet plan\",\n    \"daily_calories\": 2000,\n    \"protein_grams\": 150,\n    \"carbs_grams\": 225,\n    \"fats_grams\": 55,\n    \"status\": \"active\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1"
-							]
-						},
-						"description": "Update diet plan by ID"
-					}
-				},
-				{
-					"name": "Delete Diet Plan",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1"
-							]
-						},
-						"description": "Delete diet plan by ID"
-					}
-				},
-				{
-					"name": "Get Diet Plan Meal Plans",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1/meal-plans",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1",
-								"meal-plans"
-							]
-						},
-						"description": "Get meal plans for a diet plan"
-					}
-				},
-				{
-					"name": "Duplicate Diet Plan",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"new_title\": \"Duplicated Diet Plan\",\n    \"client_id\": 3,\n    \"start_date\": \"2025-04-01\",\n    \"end_date\": \"2025-04-30\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1/duplicate",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1",
-								"duplicate"
-							]
-						},
-						"description": "Duplicate an existing diet plan"
-					}
-				}
-			]
-		},
-		{
-			"name": "Meal Plans",
-			"item": [
-				{
-					"name": "Create Meal Plan",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"day_of_week\": \"monday\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1/meal-plans",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1",
-								"meal-plans"
-							]
-						},
-						"description": "Create a new meal plan for a diet plan"
-					}
-				},
-				{
-					"name": "Get Meal Plan",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1/meal-plans/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1",
-								"meal-plans",
-								"1"
-							]
-						},
-						"description": "Get meal plan by ID"
-					}
-				},
-				{
-					"name": "Delete Meal Plan",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1/meal-plans/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1",
-								"meal-plans",
-								"1"
-							]
-						},
-						"description": "Delete meal plan by ID"
-					}
-				}
-			]
-		},
-		{
-			"name": "Meals",
-			"item": [
-				{
-					"name": "Create Meal",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"meal_type\": \"breakfast\",\n    \"title\": \"Spinach and Mushroom Omelette with Whole Grain Toast\",\n    \"description\": \"A protein-rich breakfast with egg whites, spinach, mushrooms, and spices. Served with whole grain toast.\",\n    \"calories\": 350,\n    \"protein_grams\": 25,\n    \"carbs_grams\": 35,\n    \"fats_grams\": 12,\n    \"time_of_day\": \"08:00:00\",\n    \"recipes\": {\n        \"ingredients\": [\n            \"3 egg whites\",\n            \"1 whole egg\",\n            \"1 cup fresh spinach, chopped\",\n            \"1/2 cup mushrooms, sliced\",\n            \"1 small onion, finely diced\",\n            \"1 tsp olive oil\",\n            \"1/4 tsp turmeric powder\",\n            \"1/4 tsp black pepper\",\n            \"Salt to taste\",\n            \"1 slice whole grain bread\"\n        ],\n        \"instructions\": [\n            \"Heat olive oil in a non-stick pan over medium heat\",\n            \"Sauté onions until translucent, about 2 minutes\",\n            \"Add mushrooms and cook until soft, about 3 minutes\",\n            \"Add spinach and cook until wilted, about 1 minute\",\n            \"Beat eggs in a bowl with turmeric, black pepper, and salt\",\n            \"Pour egg mixture over vegetables and cook until set\",\n            \"Fold omelette in half and cook for another minute\",\n            \"Toast the whole grain bread and serve alongside the omelette\"\n        ]\n    }\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/meals",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1",
-								"meal-plans",
-								"1",
-								"meals"
-							]
-						},
-						"description": "Create a new meal for a meal plan"
-					}
-				},
-				{
-					"name": "Get Meal",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/meals/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1",
-								"meal-plans",
-								"1",
-								"meals",
-								"1"
-							]
-						},
-						"description": "Get meal by ID"
-					}
-				},
-				{
-					"name": "Update Meal",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"title\": \"Updated Breakfast\",\n    \"description\": \"Updated description for the breakfast meal\",\n    \"calories\": 300,\n    \"protein_grams\": 20,\n    \"carbs_grams\": 30,\n    \"fats_grams\": 10,\n    \"time_of_day\": \"07:30:00\",\n    \"recipes\": {\n        \"ingredients\": [\n            \"Updated ingredients list\"\n        ],\n        \"instructions\": [\n            \"Updated cooking instructions\"\n        ]\n    }\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/meals/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1",
-								"meal-plans",
-								"1",
-								"meals",
-								"1"
-							]
-						},
-						"description": "Update meal by ID"
-					}
-				},
-				{
-					"name": "Delete Meal",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/meals/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"diet-plans",
-								"1",
-								"meal-plans",
-								"1",
-								"meals",
-								"1"
-							]
-						},
-						"description": "Delete meal by ID"
-					}
-				}
-			]
-		},
-		{
-			"name": "Assessments",
-			"item": [
 				{
 					"name": "Start Assessment",
 					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
 						"method": "POST",
 						"header": [
 							{
@@ -1608,76 +2662,30 @@
 								"key": "Content-Type",
 								"value": "application/json",
 								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
 							}
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"assessment_type\": \"diet\"\n}"
+							"raw": "{\n    \"assessment_type\": \"moderate\",\n    \"abandon_existing\": false\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/users/3/assessments",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"3",
-								"assessments"
-							]
+							"raw": "{{base_url}}/api/web-assessment/start",
+							"host": ["{{base_url}}"],
+							"path": ["api", "web-assessment", "start"]
 						},
-						"description": "Start a new assessment for a user"
-					}
+						"description": "Start a new assessment"
+					},
+					"response": []
 				},
 				{
-					"name": "Get Assessment",
+					"name": "Get Current Question",
 					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
 						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/assessments/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"assessments",
-								"1"
-							]
-						},
-						"description": "Get assessment by ID"
-					}
-				},
-				{
-					"name": "Update Assessment",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
 						"header": [
 							{
 								"key": "Accept",
@@ -1685,42 +2693,34 @@
 								"type": "text"
 							},
 							{
-								"key": "Content-Type",
-								"value": "application/json",
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
 								"type": "text"
 							}
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"current_phase\": 2,\n    \"current_question\": \"health_conditions\",\n    \"responses\": {\n        \"age\": 33,\n        \"gender\": \"male\",\n        \"height\": 180,\n        \"current_weight\": 70,\n        \"target_weight\": 65,\n        \"activity_level\": \"lightly_active\"\n    }\n}"
-						},
 						"url": {
-							"raw": "{{base_url}}/api/assessments/1",
-							"host": [
-								"{{base_url}}"
-							],
+							"raw": "{{base_url}}/api/web-assessment/question?session_id=123",
+							"host": ["{{base_url}}"],
 							"path": [
 								"api",
-								"assessments",
-								"1"
-							]
-						},
-						"description": "Update assessment progress"
-					}
-				},
-				{
-					"name": "Complete Assessment",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
+								"web-assessment",
+								"question"
+							],
+							"query": [
 								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
+									"key": "session_id",
+									"value": "123",
+									"description": "Assessment session ID"
 								}
 							]
 						},
+						"description": "Get current question for assessment session"
+					},
+					"response": []
+				},
+				{
+					"name": "Submit Response",
+					"request": {
 						"method": "POST",
 						"header": [
 							{
@@ -1732,1252 +2732,221 @@
 								"key": "Content-Type",
 								"value": "application/json",
 								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
 							}
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"final_responses\": {\n        \"plan_type\": \"complete\"\n    }\n}"
+							"raw": "{\n    \"session_id\": 123,\n    \"question_id\": \"age\",\n    \"response\": 35\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/assessments/1/complete",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"assessments",
-								"1",
-								"complete"
-							]
+							"raw": "{{base_url}}/api/web-assessment/respond",
+							"host": ["{{base_url}}"],
+							"path": ["api", "web-assessment", "respond"]
 						},
-						"description": "Mark assessment as complete and trigger plan creation"
-					}
+						"description": "Submit response to current question"
+					},
+					"response": []
 				},
 				{
-					"name": "Get Assessment Result",
+					"name": "Resume Assessment",
 					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
+						"method": "POST",
 						"header": [
 							{
 								"key": "Accept",
 								"value": "application/json",
 								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
 							}
 						],
-						"url": {
-							"raw": "{{base_url}}/api/assessments/1/result",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"assessments",
-								"1",
-								"result"
-							]
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"session_id\": 123\n}"
 						},
-						"description": "Get the result of a completed assessment"
-					}
+						"url": {
+							"raw": "{{base_url}}/api/web-assessment/resume",
+							"host": ["{{base_url}}"],
+							"path": ["api", "web-assessment", "resume"]
+						},
+						"description": "Resume an existing assessment"
+					},
+					"response": []
 				}
-			]
-		},
-		{
-			"name": "AI Configuration",
-			"item": [
-				{
-					"name": "List AI Configurations",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1/ai-configurations",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1",
-								"ai-configurations"
-							]
-						},
-						"description": "List AI configurations for a gym"
-					}
-				},
-				{
-					"name": "Create AI Configuration",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"OpenAI GPT-4\",\n    \"provider\": \"openai\",\n    \"model\": \"gpt-4\",\n    \"api_key\": \"your-api-key-here\",\n    \"settings\": {\n        \"temperature\": 0.7,\n        \"max_tokens\": 4000,\n        \"top_p\": 1.0\n    },\n    \"is_default\": true,\n    \"status\": \"active\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1/ai-configurations",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1",
-								"ai-configurations"
-							]
-						},
-						"description": "Create a new AI configuration for a gym"
-					}
-				},
-				{
-					"name": "Update AI Configuration",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Updated OpenAI Config\",\n    \"model\": \"gpt-4-turbo\",\n    \"settings\": {\n        \"temperature\": 0.5,\n        \"max_tokens\": 8000\n    },\n    \"status\": \"active\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1/ai-configurations/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1",
-								"ai-configurations",
-								"1"
-							]
-						},
-						"description": "Update an AI configuration"
-					}
-				},
-				{
-					"name": "Delete AI Configuration",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1/ai-configurations/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1",
-								"ai-configurations",
-								"1"
-							]
-						},
-						"description": "Delete an AI configuration"
-					}
-				},
-				{
-					"name": "Test AI Configuration",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{auth_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"prompt\": \"Create a sample breakfast recipe for weight loss\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/gyms/1/ai-configurations/1/test",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"gyms",
-								"1",
-								"ai-configurations",
-								"1",
-								"test"
-							]
-						},
-						"description": "Test an AI configuration with a sample prompt"
-					}
-				}
-			]
-		},
-		{
-			"name": "Subscriptions",
-			"item": [
-			  {
-				"name": "Platform Subscription Plans",
-				"item": [
-				  {
-					"name": "List Subscription Plans",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "GET",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/subscription-plans",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "subscription-plans"
-						]
-					  },
-					  "description": "Get list of platform subscription plans (admin only)"
-					}
-				  },
-				  {
-					"name": "Get Public Subscription Plans",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "GET",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/public-subscription-plans",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "public-subscription-plans"
-						]
-					  },
-					  "description": "Get list of publicly available subscription plans"
-					}
-				  },
-				  {
-					"name": "Create Subscription Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "POST",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"name\": \"Starter Plan\",\n    \"code\": \"starter\",\n    \"description\": \"Basic plan for small gyms with up to 50 clients.\",\n    \"monthly_price\": 49.99,\n    \"quarterly_price\": 134.97,\n    \"annual_price\": 479.90,\n    \"features\": {\n        \"max_clients\": 50,\n        \"max_diet_plans\": 2,\n        \"ai_meal_generation\": true,\n        \"ai_meal_generation_limit\": 50\n    },\n    \"is_active\": true\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/subscription-plans",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "subscription-plans"
-						]
-					  },
-					  "description": "Create a new subscription plan (admin only)"
-					}
-				  },
-				  {
-					"name": "Get Subscription Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "GET",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/subscription-plans/1",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "subscription-plans",
-						  "1"
-						]
-					  },
-					  "description": "Get subscription plan details"
-					}
-				  },
-				  {
-					"name": "Update Subscription Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "PUT",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"name\": \"Updated Starter Plan\",\n    \"monthly_price\": 59.99,\n    \"features\": {\n        \"max_clients\": 75,\n        \"max_diet_plans\": 3,\n        \"ai_meal_generation\": true,\n        \"ai_meal_generation_limit\": 100\n    }\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/subscription-plans/1",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "subscription-plans",
-						  "1"
-						]
-					  },
-					  "description": "Update subscription plan details (admin only)"
-					}
-				  },
-				  {
-					"name": "Delete Subscription Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "DELETE",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/subscription-plans/1",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "subscription-plans",
-						  "1"
-						]
-					  },
-					  "description": "Delete subscription plan (admin only)"
-					}
-				  }
-				],
-				"description": "Platform subscription plan management"
-			  },
-			  {
-				"name": "Gym Subscriptions",
-				"item": [
-				  {
-					"name": "Get Gym Subscription",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "GET",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/subscription",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "subscription"
-						]
-					  },
-					  "description": "Get gym's active subscription"
-					}
-				  },
-				  {
-					"name": "Subscribe Gym to Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "POST",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"plan_id\": 1,\n    \"billing_cycle\": \"monthly\",\n    \"payment_provider\": \"stripe\",\n    \"payment_method_id\": \"pm_test_stripe_payment_method\",\n    \"payment_data\": {}\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/subscribe",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "subscribe"
-						]
-					  },
-					  "description": "Subscribe gym to a platform plan"
-					}
-				  },
-				  {
-					"name": "Update Gym Subscription",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "PUT",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"plan_id\": 2,\n    \"payment_method_id\": \"pm_new_payment_method\"\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/subscription",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "subscription"
-						]
-					  },
-					  "description": "Update gym's subscription plan or payment method"
-					}
-				  },
-				  {
-					"name": "Cancel Gym Subscription",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "POST",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"at_period_end\": true\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/subscription/cancel",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "subscription",
-						  "cancel"
-						]
-					  },
-					  "description": "Cancel gym's subscription"
-					}
-				  }
-				],
-				"description": "Gym subscription management"
-			  },
-			  {
-				"name": "Gym Subscription Plans",
-				"item": [
-				  {
-					"name": "List Gym Subscription Plans",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "GET",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/subscription-plans?active=true",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "subscription-plans"
-						],
-						"query": [
-						  {
-							"key": "active",
-							"value": "true",
-							"description": "Filter by active status"
-						  }
-						]
-					  },
-					  "description": "Get list of gym's subscription plans for clients"
-					}
-				  },
-				  {
-					"name": "Get Public Gym Plans",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "GET",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/public-subscription-plans",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "public-subscription-plans"
-						]
-					  },
-					  "description": "Get list of publicly available gym subscription plans for clients"
-					}
-				  },
-				  {
-					"name": "Create Gym Subscription Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "POST",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"name\": \"Basic Client Plan\",\n    \"description\": \"Basic subscription plan for gym clients\",\n    \"price\": 29.99,\n    \"billing_cycle\": \"monthly\",\n    \"features\": {\n        \"personal_training\": false,\n        \"diet_plans\": true,\n        \"unlimited_workouts\": false\n    },\n    \"is_active\": true\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/subscription-plans",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "subscription-plans"
-						]
-					  },
-					  "description": "Create a new gym subscription plan for clients"
-					}
-				  },
-				  {
-					"name": "Get Gym Subscription Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "GET",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/subscription-plans/1",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "subscription-plans",
-						  "1"
-						]
-					  },
-					  "description": "Get gym subscription plan details"
-					}
-				  },
-				  {
-					"name": "Update Gym Subscription Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "PUT",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"name\": \"Updated Basic Client Plan\",\n    \"price\": 34.99,\n    \"features\": {\n        \"personal_training\": true,\n        \"diet_plans\": true,\n        \"unlimited_workouts\": false\n    }\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/subscription-plans/1",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "subscription-plans",
-						  "1"
-						]
-					  },
-					  "description": "Update gym subscription plan details"
-					}
-				  },
-				  {
-					"name": "Delete Gym Subscription Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "DELETE",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/gyms/1/subscription-plans/1",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "gyms",
-						  "1",
-						  "subscription-plans",
-						  "1"
-						]
-					  },
-					  "description": "Delete gym subscription plan"
-					}
-				  }
-				],
-				"description": "Gym subscription plan management for clients"
-			  },
-			  {
-				"name": "Client Subscriptions",
-				"item": [
-				  {
-					"name": "List Client Subscriptions",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "GET",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/client-subscriptions?gym_id=1&status=active",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "client-subscriptions"
-						],
-						"query": [
-						  {
-							"key": "gym_id",
-							"value": "1",
-							"description": "Filter by gym ID"
-						  },
-						  {
-							"key": "status",
-							"value": "active",
-							"description": "Filter by status"
-						  }
-						]
-					  },
-					  "description": "Get list of client subscriptions"
-					}
-				  },
-				  {
-					"name": "Create Client Subscription",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "POST",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"user_id\": 3,\n    \"gym_id\": 1,\n    \"gym_subscription_plan_id\": 1,\n    \"status\": \"active\",\n    \"start_date\": \"2025-03-01\",\n    \"auto_renew\": true,\n    \"payment_status\": \"paid\"\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/client-subscriptions",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "client-subscriptions"
-						]
-					  },
-					  "description": "Create a new client subscription"
-					}
-				  },
-				  {
-					"name": "Get Client Subscription",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "GET",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/client-subscriptions/1",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "client-subscriptions",
-						  "1"
-						]
-					  },
-					  "description": "Get client subscription details"
-					}
-				  },
-				  {
-					"name": "Update Client Subscription",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "PUT",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"status\": \"active\",\n    \"end_date\": \"2025-06-01\",\n    \"auto_renew\": false,\n    \"payment_status\": \"paid\"\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/client-subscriptions/1",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "client-subscriptions",
-						  "1"
-						]
-					  },
-					  "description": "Update client subscription details"
-					}
-				  },
-				  {
-					"name": "Delete Client Subscription",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "DELETE",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "url": {
-						"raw": "{{base_url}}/api/client-subscriptions/1",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "client-subscriptions",
-						  "1"
-						]
-					  },
-					  "description": "Delete client subscription"
-					}
-				  },
-				  {
-					"name": "Subscribe User to Gym Plan",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "POST",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{\n    \"gym_id\": 1,\n    \"gym_subscription_plan_id\": 1,\n    \"auto_renew\": true,\n    \"payment_status\": \"paid\"\n}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/users/3/subscribe",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "users",
-						  "3",
-						  "subscribe"
-						]
-					  },
-					  "description": "Subscribe a user to a gym subscription plan"
-					}
-				  }
-				],
-				"description": "Client subscription management"
-			  },
-			  {
-				"name": "AI Meal Generation",
-				"item": [
-				  {
-					"name": "Generate Meals with AI",
-					"request": {
-					  "auth": {
-						"type": "bearer",
-						"bearer": [
-						  {
-							"key": "token",
-							"value": "{{auth_token}}",
-							"type": "string"
-						  }
-						]
-					  },
-					  "method": "POST",
-					  "header": [
-						{
-						  "key": "Accept",
-						  "value": "application/json",
-						  "type": "text"
-						},
-						{
-						  "key": "Content-Type",
-						  "value": "application/json",
-						  "type": "text"
-						}
-					  ],
-					  "body": {
-						"mode": "raw",
-						"raw": "{}"
-					  },
-					  "url": {
-						"raw": "{{base_url}}/api/diet-plans/1/meal-plans/1/generate-ai",
-						"host": [
-						  "{{base_url}}"
-						],
-						"path": [
-						  "api",
-						  "diet-plans",
-						  "1",
-						  "meal-plans",
-						  "1",
-						  "generate-ai"
-						]
-					  },
-					  "description": "Generate meals for a meal plan using AI (subscription required)"
-					}
-				  }
-				],
-				"description": "AI-based meal generation with subscription feature checks"
-			  }
 			],
-			"description": "Subscription management and feature access"
-		  }
-	]
+			"description": "Endpoints for web-based assessment flow"
+		},
+		{
+			"name": "Web Diet Plan",
+			"item": [
+				{
+					"name": "Get Active Diet Plan",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/web-diet-plan/active",
+							"host": ["{{base_url}}"],
+							"path": ["api", "web-diet-plan", "active"]
+						},
+						"description": "Get active diet plan for user"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Day Plan",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/web-diet-plan/day?plan_id=123&day=monday",
+							"host": ["{{base_url}}"],
+							"path": ["api", "web-diet-plan", "day"],
+							"query": [
+								{
+									"key": "plan_id",
+									"value": "123",
+									"description": "Diet plan ID"
+								},
+								{
+									"key": "day",
+									"value": "monday",
+									"description": "Day of week"
+								}
+							]
+						},
+						"description": "Get meal plan for specific day"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Meal Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/web-diet-plan/meal?meal_id=456",
+							"host": ["{{base_url}}"],
+							"path": ["api", "web-diet-plan", "meal"],
+							"query": [
+								{
+									"key": "meal_id",
+									"value": "456",
+									"description": "Meal ID"
+								}
+							]
+						},
+						"description": "Get detailed meal information"
+					},
+					"response": []
+				},
+				{
+					"name": "List Diet Plans",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/web-diet-plan/list",
+							"host": ["{{base_url}}"],
+							"path": ["api", "web-diet-plan", "list"]
+						},
+						"description": "List all diet plans for user"
+					},
+					"response": []
+				},
+				{
+					"name": "Archive Diet Plan",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"plan_id\": 123\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/web-diet-plan/archive",
+							"host": ["{{base_url}}"],
+							"path": ["api", "web-diet-plan", "archive"]
+						},
+						"description": "Archive an existing diet plan"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for diet plan management"
+		}
+    ]
 }

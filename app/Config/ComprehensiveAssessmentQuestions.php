@@ -19,7 +19,7 @@ class ComprehensiveAssessmentQuestions
 
         // Start with moderate questions
         $comprehensiveQuestions = $moderateQuestions;
-        Log::info('comprehensiveQuestions',$comprehensiveQuestions);
+        Log::info('comprehensiveQuestions', $comprehensiveQuestions);
         // Modify the health_conditions question flow to include medications
         $comprehensiveQuestions['health_conditions']['next_conditional']['default'] = 'medications';
 
@@ -262,6 +262,24 @@ class ComprehensiveAssessmentQuestions
                 ['id' => '11', 'title' => __('attributes.balanced_macros')],
                 ['id' => '12', 'title' => __('attributes.home_cooking')],
                 ['id' => '13', 'title' => __('attributes.no_specific_prefs')]
+            ],
+            'next' => 'favorite_foods',
+            'phase' => 4
+        ];
+
+
+        // Add meal portion size after meal preferences
+        $comprehensiveQuestions['meal_portion_size'] = [
+            'prompt' => __('attributes.meal_portion_size_prompt'),
+            'type' => 'list',
+            'header' => __('attributes.meal_portion_size_header'),
+            'body' => __('attributes.meal_portion_size_body'),
+            'options' => [
+                ['id' => '1', 'title' => __('attributes.small_portion')],
+                ['id' => '2', 'title' => __('attributes.medium_portion')],
+                ['id' => '3', 'title' => __('attributes.large_portion')],
+                ['id' => '4', 'title' => __('attributes.variable_portion')],
+                ['id' => '5', 'title' => __('attributes.not_sure_portion')]
             ],
             'next' => 'favorite_foods',
             'phase' => 4

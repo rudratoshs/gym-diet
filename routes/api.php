@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\SubscriptionPlanController;
 use App\Http\Controllers\Api\GymSubscriptionPlanController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\PaymentWebhookController;
+use App\Http\Controllers\Api\WebAssessmentController;
+use App\Http\Controllers\Api\WebDietPlanController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
@@ -91,6 +93,28 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/gyms/{gym}/ai-configurations/{configuration}', [AIConfigurationController::class, 'destroy']);
     Route::post('/gyms/{gym}/ai-configurations/{configuration}/test', [AIConfigurationController::class, 'test']);
 
+
+    Route::prefix('web-assessment')->group(function () {
+        Route::get('/status', [WebAssessmentController::class, 'status']);
+        Route::post('/start', [WebAssessmentController::class, 'start']);
+        Route::get('/question', [WebAssessmentController::class, 'getCurrentQuestion']);
+        Route::post('/respond', [WebAssessmentController::class, 'submitResponse']);
+        Route::post('/resume', [WebAssessmentController::class, 'resume']);
+        Route::post('/generate-plan', [WebAssessmentController::class, 'generateDietPlan']);
+        Route::delete('/delete', [WebAssessmentController::class, 'delete']);
+    });
+    
+
+    // Diet Plan Management Routes
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::prefix('web-diet-plan')->group(function () {
+        Route::get('/active', [WebDietPlanController::class, 'getActivePlan']);
+        Route::get('/day', [WebDietPlanController::class, 'getDayPlan']);
+        Route::get('/meal', [WebDietPlanController::class, 'getMealDetails']);
+        Route::get('/list', [WebDietPlanController::class, 'listPlans']);
+        Route::post('/archive', [WebDietPlanController::class, 'archivePlan']);
+    });
+});
     // Platform Subscription Plans routes (admin only)
     Route::middleware('role:admin')->group(function () {
         Route::get('/subscription-plans', [SubscriptionPlanController::class, 'index']);

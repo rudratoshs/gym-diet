@@ -33,6 +33,8 @@ class WhatsAppProgressTrackingService
         $parameter2 = $commandParts[2] ?? '';
 
         switch ($action) {
+            case 'track progress':
+            case 'progress tracking':
             case 'progress':
                 return $this->handleProgressReport($user, $parameter1);
 
@@ -257,7 +259,10 @@ class WhatsAppProgressTrackingService
     /**
      * Handle daily check-in command
      */
-    protected function handleDailyCheckin(User $user): string
+    /**
+     * Handle daily check-in command
+     */
+    public function handleDailyCheckin(User $user): string
     {
         // First, check if a check-in was already done today
         $today = Carbon::today()->format('Y-m-d');
@@ -266,11 +271,18 @@ class WhatsAppProgressTrackingService
             ->first();
 
         if ($existingEntry) {
-            // Update existing daily progress
-            $this->getWhatsAppService()->sendTextMessage(
-                $user->whatsapp_phone,
-                "You've already started a check-in today. Let's continue tracking your progress."
-            );
+            // If we have an entry, check its state
+            if (isset($existingEntry->check_in_state) && $existingEntry->check_in_state) {
+                // Continue from where they left off
+                return $this->continueCheckInFlow($user, $existingEntry);
+            } else {
+                // They started but didn't progress - start water tracking
+                $existingEntry->check_in_state = 'water_tracking';
+                $existingEntry->save();
+
+                return "You've already started a check-in today. Let's continue tracking your progress.\n\n" .
+                    "How much water have you had today? (in glasses or ml)";
+            }
         } else {
             // Create new daily progress entry
             $dailyProgress = new DailyProgress();
@@ -301,20 +313,69 @@ class WhatsAppProgressTrackingService
                 $dailyProgress->total_meals = 3; // Default if no diet plan
             }
 
+            // Set initial state
+            $dailyProgress->check_in_state = 'water_tracking';
             $dailyProgress->save();
 
-            // Start interactive check-in process
-            $this->getWhatsAppService()->sendTextMessage(
-                $user->whatsapp_phone,
-                "📝 *Daily Check-in: " . Carbon::today()->format('D, M j') . "* 📝\n\n" .
-                "Let's track your progress for today! I'll ask a few quick questions."
-            );
+            // Return just the introduction with the water question
+            return "📝 *Daily Check-in: " . Carbon::today()->format('D, M j') . "* 📝\n\n" .
+                "Let's track your progress for today! I'll ask a few quick questions.\n\n" .
+                "First, how much water have you had today? (in glasses or ml)";
         }
+    }
 
-        // Begin interactive water tracking
-        $this->startWaterTracking($user);
 
-        return ''; // No immediate response since we're starting an interactive flow
+    /**
+     * Continue check-in flow based on current state
+     */
+    protected function continueCheckInFlow(User $user, DailyProgress $progress): string
+    {
+        switch ($progress->check_in_state) {
+            case 'water_tracking':
+                return "How much water have you had today? (in glasses or ml)";
+
+            case 'meal_tracking':
+                $totalMeals = $progress->total_meals;
+                return "How many of your planned meals have you completed today? (out of {$totalMeals})";
+
+            case 'exercise_tracking':
+                return "Have you completed your exercise today? (yes/no/rest day)";
+
+            case 'mood_tracking':
+                return "How are you feeling today? (great/good/low)";
+
+            default:
+                // Unknown state or completed
+                return "Your check-in appears to be complete. Type 'progress' to see your stats.";
+        }
+    }
+
+    /**
+     * Process user response based on current check-in state
+     * 
+     * @param User $user The user
+     * @param string $state Current check-in state
+     * @param string $response User's response
+     * @return string|null Response message or null if no response needed
+     */
+    public function processCheckInResponse(User $user, string $state, string $response): ?string
+    {
+        switch ($state) {
+            case 'water_tracking':
+                return $this->trackWaterIntake($user, $response);
+
+            case 'meal_tracking':
+                return $this->trackMealCompliance($user, $response);
+
+            case 'exercise_tracking':
+                return $this->trackExerciseCompletion($user, $response);
+
+            case 'mood_tracking':
+                return $this->trackWellbeing($user, 'mood', $response);
+
+            default:
+                return "I'm not sure what you're responding to. Type 'help' for available commands.";
+        }
     }
 
     /**
@@ -382,15 +443,13 @@ class WhatsAppProgressTrackingService
 
         if ($waterIntake > 0) {
             $dailyProgress->water_intake = $waterIntake;
+            // Update the state to the next step
+            $dailyProgress->check_in_state = 'meal_tracking';
             $dailyProgress->save();
 
-            // If this is part of a check-in flow, continue to meal tracking
-            if (in_array($amount, ['water_1', 'water_2', 'water_3'])) {
-                $this->startMealTracking($user);
-                return ""; // No response needed, continuing flow
-            }
-
-            return "💧 Great! I've recorded your water intake as " . ($waterIntake >= 1000 ? ($waterIntake / 1000) . " liters" : $waterIntake . " ml") . ".";
+            return "💧 Great! I've recorded your water intake as " .
+                ($waterIntake >= 1000 ? ($waterIntake / 1000) . " liters" : $waterIntake . " ml") . ".\n\n" .
+                "Next, how many of your planned meals have you completed today? (out of {$dailyProgress->total_meals})";
         }
 
         return "I couldn't understand that water amount. Please enter a number of glasses or milliliters (e.g., '8 glasses' or '2000 ml').";
@@ -452,7 +511,7 @@ class WhatsAppProgressTrackingService
         // Handle button responses
         if ($mealInfo === 'meals_all') {
             $mealsCompleted = $totalMeals;
-        } elseif ($mealInfo === 'meals_none') {
+        } elseif ($mealInfo === 'meals_none' || $mealInfo === '0') {
             $mealsCompleted = 0;
         } elseif ($mealInfo === 'meals_some') {
             // Will ask for specific number in next message
@@ -468,15 +527,21 @@ class WhatsAppProgressTrackingService
         }
 
         $dailyProgress->meals_completed = $mealsCompleted;
+        // Update state to move to exercise tracking
+        $dailyProgress->check_in_state = 'exercise_tracking';
         $dailyProgress->save();
 
         // If this is part of a check-in flow, continue to exercise tracking
-        if (in_array($mealInfo, ['meals_all', 'meals_none']) || is_numeric($mealInfo)) {
-            $this->startExerciseTracking($user);
-            return ""; // No response needed, continuing flow
+        if (in_array($mealInfo, ['meals_all', 'meals_none', '0']) || is_numeric($mealInfo)) {
+            $compliance = ($totalMeals > 0) ? round(($mealsCompleted / $totalMeals) * 100) : 0;
+
+            // Return the next question for exercise tracking as plain text
+            return "🍽️ Recorded: {$mealsCompleted}/{$totalMeals} meals ({$compliance}%).\n\n" .
+                "💪 *Exercise*\n\n" .
+                "Have you completed your exercise today? (yes/no/rest day)";
         }
 
-        $compliance = round(($mealsCompleted / $totalMeals) * 100);
+        $compliance = ($totalMeals > 0) ? round(($mealsCompleted / $totalMeals) * 100) : 0;
         return "🍽️ Great! I've recorded your meal compliance as {$mealsCompleted}/{$totalMeals} meals ({$compliance}%).";
     }
 
@@ -521,29 +586,30 @@ class WhatsAppProgressTrackingService
         }
 
         // Parse exercise status
-        if ($status === 'yes' || $status === 'exercise_yes') {
+        if ($status === 'yes' || $status === 'exercise_yes' || $status === 'y') {
             $dailyProgress->exercise_done = true;
             $dailyProgress->exercise_duration = 30; // Default assumption
-        } elseif ($status === 'no' || $status === 'exercise_no') {
+        } elseif ($status === 'no' || $status === 'exercise_no' || $status === 'n') {
             $dailyProgress->exercise_done = false;
-        } elseif ($status === 'rest' || $status === 'exercise_rest') {
+        } elseif ($status === 'rest' || $status === 'exercise_rest' || $status === 'rest day') {
             $dailyProgress->exercise_done = true;
             $dailyProgress->notes = isset($dailyProgress->notes) ?
                 $dailyProgress->notes . " Rest day." : "Rest day.";
         } elseif (is_numeric($status)) {
             $dailyProgress->exercise_done = true;
             $dailyProgress->exercise_duration = (int) $status;
+        } else {
+            return "Please answer with 'yes', 'no', or 'rest day'.";
         }
 
+        // Update state to move to mood tracking
+        $dailyProgress->check_in_state = 'mood_tracking';
         $dailyProgress->save();
 
-        // If this is part of a check-in flow, continue to mood tracking
-        if (in_array($status, ['exercise_yes', 'exercise_no', 'exercise_rest'])) {
-            $this->startMoodTracking($user);
-            return ""; // No response needed, continuing flow
-        }
-
-        return "💪 Your exercise status has been updated.";
+        // Return the mood question as plain text
+        return "💪 " . ($dailyProgress->exercise_done ? "Exercise completed!" : "No exercise today.") . "\n\n" .
+            "😊 *Energy & Mood*\n\n" .
+            "How are you feeling today? (great/good/low)";
     }
 
     /**
@@ -592,7 +658,7 @@ class WhatsAppProgressTrackingService
         $moodValue = 'good';
 
         // Handle different input options
-        if ($status === 'mood_great' || $status === 'high' || $status === 'excellent') {
+        if ($status === 'mood_great' || $status === 'high' || $status === 'excellent' || $status === 'great') {
             $energyValue = 'high';
             $moodValue = 'excellent';
         } elseif ($status === 'mood_good' || $status === 'moderate' || $status === 'good') {
@@ -601,6 +667,8 @@ class WhatsAppProgressTrackingService
         } elseif ($status === 'mood_low' || $status === 'low' || $status === 'poor') {
             $energyValue = 'low';
             $moodValue = 'fair';
+        } else {
+            return "Please describe how you're feeling as 'great', 'good', or 'low'.";
         }
 
         // Set the appropriate field based on type
@@ -610,14 +678,12 @@ class WhatsAppProgressTrackingService
             $dailyProgress->mood = $moodValue;
         }
 
+        // Mark check-in as complete
+        $dailyProgress->check_in_state = 'completed';
         $dailyProgress->save();
 
-        // If this is part of a check-in flow, complete the check-in
-        if (in_array($status, ['mood_great', 'mood_good', 'mood_low'])) {
-            return $this->completeCheckin($user);
-        }
-
-        return "😊 Thanks for sharing how you're feeling today. Your wellness data has been updated.";
+        // Return the completion message
+        return $this->completeCheckin($user);
     }
 
     /**

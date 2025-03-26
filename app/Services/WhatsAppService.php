@@ -4,13 +4,15 @@ namespace App\Services;
 use App\Models\AssessmentSession;
 use App\Models\DietPlan;
 use App\Models\Meal;
-use App\Models\MealPlan;
+use App\Models\DailyProgress;
 use App\Models\User;
 use App\Models\WhatsappConversation;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 
+//https://www.ominiflow.com/webhook/wpbox/receive/PqwXZLqRuj4SvIlCrfS9w7GBk4aiWC0gAV9aoNy4f4fd5ae7
 class WhatsAppService
 {
     protected $apiKey;
@@ -94,10 +96,13 @@ class WhatsAppService
             ->latest()
             ->first();
 
-        // Otherwise, check for commands
-        $lowerContent = strtolower(trim($content));
+        // Clean and normalize content
+        $lowerContent = strtolower(trim(preg_replace('/\s+/', ' ', $content)));
+        $lowerContent = preg_replace('/[^\p{L}\p{N}\s]/u', '', $lowerContent);
 
-        // First, check for standard commands
+        Log::info('lower content' . $lowerContent);
+
+        // Handle standard commands first - these always take priority
         if ($lowerContent === 'start' || $lowerContent === 'begin' || $lowerContent === 'hi' || $lowerContent === 'hello') {
             // Start new assessment
             return $this->startAssessment($user);
@@ -105,11 +110,41 @@ class WhatsAppService
             return $this->sendHelpMessage($user);
         } elseif ($lowerContent === 'plan' || $lowerContent === 'my plan') {
             return $this->sendCurrentPlan($user);
-        } elseif ($lowerContent === 'progress') {
-            return $this->sendProgressUpdate($user);
         } elseif (Str::startsWith($lowerContent, 'day ')) {
             $day = trim(substr($lowerContent, 4));
             return $this->sendDayMealPlan($user, $this->getCurrentDietPlan($user), $day);
+        } elseif (Str::startsWith($lowerContent, 'recipe')) {
+            $params = explode(' ', substr($lowerContent, 7), 2);
+            if (count($params) == 2) {
+                return $this->sendRecipe($user, $params[0], $params[1]);
+            }
+        } elseif ($lowerContent === 'calendar sync' || $lowerContent === 'sync calendar') {
+            $syncResult = $this->getProgressTrackingService()->createCalendarEntries($user);
+            $this->sendTextMessage($user->whatsapp_phone, $syncResult);
+            return null;
+        }
+
+        // After standard commands, check if user is in a check-in flow
+        $today = Carbon::today()->format('Y-m-d');
+        $dailyProgress = DailyProgress::where('user_id', $user->id)
+            ->where('tracking_date', $today)
+            ->first();
+
+        if ($dailyProgress && isset($dailyProgress->check_in_state) && $dailyProgress->check_in_state) {
+            // Process the response based on current check-in state
+            $progressService = $this->getProgressTrackingService();
+            if ($progressService) {
+                $progressResponse = $progressService->processCheckInResponse(
+                    $user,
+                    $dailyProgress->check_in_state,
+                    $lowerContent
+                );
+
+                if ($progressResponse !== null) {
+                    $this->sendTextMessage($user->whatsapp_phone, $progressResponse);
+                    return null;
+                }
+            }
         }
 
         // Check for grocery list commands
@@ -127,31 +162,40 @@ class WhatsAppService
         }
 
         // Check for progress tracking commands
-        $progressResponse = $this->getProgressTrackingService()->processProgressCommand($user, $lowerContent);
-        if ($progressResponse !== null) {
-            $this->sendTextMessage($user->whatsapp_phone, $progressResponse);
-            return null;
-        }
+        if (
+            Str::startsWith($lowerContent, [
+                'progress',
+                'track progress',
+                'progress tracking',
+                'checkin',
+                'check-in',
+                'water',
+                'weight',
+                'meal',
+                'exercise',
+                'workout',
+                'mood',
+                'energy',
+                'goal'
+            ])
+        ) {
+            $progressService = $this->getProgressTrackingService();
 
-        // Check for recipe commands
-        if (Str::startsWith($lowerContent, 'recipe ')) {
-            $params = explode(' ', substr($lowerContent, 7), 2);
-            if (count($params) == 2) {
-                return $this->sendRecipe($user, $params[0], $params[1]);
+            if ($progressService) {  // Ensure the service exists
+                $progressResponse = $progressService->processProgressCommand($user, $lowerContent);
+
+                if (!empty($progressResponse)) {  // Ensure response is valid
+                    $this->sendTextMessage($user->whatsapp_phone, $progressResponse);
+                    return null;
+                }
             }
-        }
-
-        // Check for calendar commands
-        if ($lowerContent === 'calendar sync' || $lowerContent === 'sync calendar') {
-            $syncResult = $this->getProgressTrackingService()->createCalendarEntries($user);
-            $this->sendTextMessage($user->whatsapp_phone, $syncResult);
-            return null;
         }
 
         if ($session) {
             // Continue assessment
             return $this->continueAssessment($user, $session, $content);
         }
+
         // Default response
         $this->sendTextMessage($user->whatsapp_phone, "I'm not sure what you mean. Type 'help' for a list of commands or 'start' to begin a new assessment.");
         return null;
@@ -1535,29 +1579,111 @@ class WhatsAppService
         Log::info('content', $content);
         $type = $content['type'] ?? null;
 
+        Log::info('from processInteractiveMessage ' . $type);
         if ($type === 'button_reply') {
             $buttonId = $content['button_reply']['id'] ?? null;
             $buttonText = $content['button_reply']['title'] ?? null;
 
-            // Otherwise, check for commands
-            $lowerContent = strtolower(trim($buttonText));
+            Log::info('Button Reply Detected', ['id' => $buttonId, 'title' => $buttonText]);
 
+            // Clean and normalize content
+            $lowerContent = strtolower(trim(preg_replace('/\s+/', ' ', $buttonText)));
             // Remove emojis and special characters
             $lowerContent = preg_replace('/[^\p{L}\p{N}\s]/u', '', $lowerContent);
+            $lowerContent = strtolower(trim(preg_replace('/\s+/', ' ', $lowerContent)));
 
-            // First, check for standard commands
+            Log::info('lower content button [' . $lowerContent . ']');
+
+            // After standard commands, check if user is in a check-in flow
+            $today = Carbon::today()->format('Y-m-d');
+            $dailyProgress = DailyProgress::where('user_id', $user->id)
+                ->where('tracking_date', $today)
+                ->first();
+
+            if ($dailyProgress && isset($dailyProgress->check_in_state) && $dailyProgress->check_in_state) {
+                // Check if the button ID matches expected check-in responses
+                if (
+                    in_array($buttonId, [
+                        'water_1',
+                        'water_2',
+                        'water_3',
+                        'meals_all',
+                        'meals_none',
+                        'meals_some',
+                        'exercise_yes',
+                        'exercise_no',
+                        'exercise_rest',
+                        'mood_great',
+                        'mood_good',
+                        'mood_low'
+                    ])
+                ) {
+
+                    $progressService = $this->getProgressTrackingService();
+                    if ($progressService) {
+                        $progressResponse = $progressService->processCheckInResponse(
+                            $user,
+                            $dailyProgress->check_in_state,
+                            $buttonId  // Use the button ID directly
+                        );
+
+                        if ($progressResponse !== null) {
+                            $this->sendTextMessage($user->whatsapp_phone, $progressResponse);
+                            return null;
+                        }
+                    }
+                }
+            }
+
+            // Handle standard commands first - these always take priority
             if ($lowerContent === 'start' || $lowerContent === 'begin' || $lowerContent === 'hi' || $lowerContent === 'hello') {
-                // Start new assessment
                 return $this->startAssessment($user);
             } elseif ($lowerContent === 'help') {
                 return $this->sendHelpMessage($user);
             } elseif ($lowerContent === 'plan' || $lowerContent === 'my plan') {
                 return $this->sendCurrentPlan($user);
-            } elseif ($lowerContent === 'progress') {
-                return $this->sendProgressUpdate($user);
             } elseif (Str::startsWith($lowerContent, 'day ')) {
                 $day = trim(substr($lowerContent, 4));
                 return $this->sendDayMealPlan($user, $this->getCurrentDietPlan($user), $day);
+            } elseif (Str::startsWith($lowerContent, 'recipe ')) {
+                $params = explode(' ', substr($lowerContent, 7), 2);
+                if (count($params) == 2) {
+                    return $this->sendRecipe($user, $params[0], $params[1]);
+                }
+            } elseif ($lowerContent === 'calendar sync' || $lowerContent === 'sync calendar') {
+                $syncResult = $this->getProgressTrackingService()->createCalendarEntries($user);
+                $this->sendTextMessage($user->whatsapp_phone, $syncResult);
+                return null;
+            }
+
+            // Check for progress tracking commands - use Str::startsWith instead of in_array
+            if (
+                Str::startsWith($lowerContent, [
+                    'progress',
+                    'track progress',
+                    'progress tracking',
+                    'checkin',
+                    'check-in',
+                    'water',
+                    'weight',
+                    'meal',
+                    'exercise',
+                    'workout',
+                    'mood',
+                    'energy',
+                    'goal'
+                ])
+            ) {
+                $progressService = $this->getProgressTrackingService();
+
+                if ($progressService) {
+                    $progressResponse = $progressService->processProgressCommand($user, $lowerContent);
+
+                    if (!empty($progressResponse)) {
+                        $this->sendTextMessage($user->whatsapp_phone, $progressResponse);
+                        return null;
+                    }
+                }
             }
 
             // Check for grocery list commands
@@ -1574,28 +1700,7 @@ class WhatsAppService
                 return null;
             }
 
-            // Check for progress tracking commands
-            $progressResponse = $this->getProgressTrackingService()->processProgressCommand($user, $lowerContent);
-            if ($progressResponse !== null) {
-                $this->sendTextMessage($user->whatsapp_phone, $progressResponse);
-                return null;
-            }
-
-            // Check for recipe commands
-            if (Str::startsWith($lowerContent, 'recipe ')) {
-                $params = explode(' ', substr($lowerContent, 7), 2);
-                if (count($params) == 2) {
-                    return $this->sendRecipe($user, $params[0], $params[1]);
-                }
-            }
-
-            // Check for calendar commands
-            if ($lowerContent === 'calendar sync' || $lowerContent === 'sync calendar') {
-                $syncResult = $this->getProgressTrackingService()->createCalendarEntries($user);
-                $this->sendTextMessage($user->whatsapp_phone, $syncResult);
-                return null;
-            }
-            // Process button response
+            // If the user is in an ongoing assessment, process their response
             $session = AssessmentSession::where('user_id', $user->id)
                 ->where('status', 'in_progress')
                 ->latest()
@@ -1608,7 +1713,6 @@ class WhatsAppService
             $listId = $content['list_reply']['id'] ?? null;
             $listTitle = $content['list_reply']['title'] ?? null;
 
-            // Process list response
             $session = AssessmentSession::where('user_id', $user->id)
                 ->where('status', 'in_progress')
                 ->latest()
@@ -1619,8 +1723,8 @@ class WhatsAppService
             }
         }
 
-        // Default response
-        $this->sendTextMessage($user->whatsapp_phone, "I'm not sure what you selected. Type 'help' for assistance or 'start' to begin a new assessment.");
+        // Default response if none of the conditions match
+        $this->sendTextMessage($user->whatsapp_phone, "I didn't understand your choice. Please try again.");
         return null;
     }
 
@@ -1917,7 +2021,7 @@ class WhatsAppService
                             'type' => 'reply',
                             'reply' => [
                                 'id' => 'track_progress',
-                                'title' => '📊 Track Progress'
+                                'title' => '📊 Progress'
                             ]
                         ],
                         [
@@ -2091,13 +2195,49 @@ class WhatsAppService
             ];
 
             if ($interactive) {
-                $payload = array_merge($payload, $interactive);
-                // Ensure interactive message has a valid body text
-                if (!isset($payload['interactive']['body']['text']) || empty(trim($payload['interactive']['body']['text']))) {
-                    $payload['interactive']['body']['text'] = "📌 Here are your available commands:";
+                // Ensure interactive messages are correctly formatted
+                $payload['type'] = 'interactive';
+
+                if (isset($interactive['type']) && $interactive['type'] === 'button') {
+                    $payload['interactive'] = [
+                        'type' => 'button',
+                        'body' => [
+                            'text' => $interactive['body']['text'] ?? $message
+                        ],
+                        'action' => [
+                            'buttons' => $interactive['action']['buttons'] ?? []
+                        ]
+                    ];
+                } elseif (isset($interactive['type']) && $interactive['type'] === 'list') {
+                    $payload['interactive'] = [
+                        'type' => 'list',
+                        'body' => [
+                            'text' => $interactive['body']['text'] ?? $message
+                        ],
+                        'action' => $interactive['action'] ?? []
+                    ];
+
+                    if (isset($interactive['header'])) {
+                        $payload['interactive']['header'] = $interactive['header'];
+                    }
+
+                    if (isset($interactive['footer'])) {
+                        $payload['interactive']['footer'] = $interactive['footer'];
+                    }
+
+                    if (!isset($payload['interactive']['action']['sections'])) {
+                        $payload['interactive']['action']['sections'] = [];
+                    }
+                } else {
+                    // Prevent duplicate key by ensuring it's correctly structured
+                    if (!isset($interactive['type'])) {
+                        Log::error('Invalid interactive structure', ['interactive' => $interactive]);
+                    } else {
+                        $payload['interactive'] = $interactive;
+                    }
                 }
             } else {
-                // Ensure message is not empty and does not exceed 1024 characters
+                // Regular text messages
                 $maxLength = 1024;
                 $message = mb_strimwidth($message ?: "📌 No message content provided.", 0, $maxLength, "...");
 
@@ -2108,17 +2248,19 @@ class WhatsAppService
                 ];
             }
 
+            $cleanPayload = $this->cleanWhatsAppPayload($payload);
             $response = Http::withToken($this->apiKey)
-                ->post("{$this->apiUrl}/{$this->phoneNumberId}/messages", $payload);
+                ->post("{$this->apiUrl}/{$this->phoneNumberId}/messages", $cleanPayload);
 
             if (!$response->successful()) {
                 Log::error('WhatsApp API error', [
                     'error' => $response->body(),
-                    'payload' => $payload,
+                    'payload' => $cleanPayload,
                     'to' => $to
                 ]);
                 return false;
             }
+
             // Find user
             $user = User::where('whatsapp_phone', $to)->first();
 
@@ -2140,6 +2282,25 @@ class WhatsAppService
             ]);
             return false;
         }
+    }
+
+    private function cleanWhatsAppPayload(array $payload): array
+    {
+        // If an interactive message exists, ensure it's formatted correctly
+        if (isset($payload['interactive'])) {
+            // If there's a duplicate nested interactive key, remove the inner one
+            if (isset($payload['interactive']['interactive'])) {
+                Log::warning('Duplicate interactive key found. Flattening structure.', ['payload' => $payload]);
+                $payload['interactive'] = $payload['interactive']['interactive'];
+            }
+
+            // Ensure the interactive message has required fields
+            if (!isset($payload['interactive']['body']['text']) || empty(trim($payload['interactive']['body']['text']))) {
+                $payload['interactive']['body']['text'] = "📌 Here are your available commands:";
+            }
+        }
+
+        return $payload;
     }
 
     private function getCurrentDietPlan(User $user): ?DietPlan

@@ -224,4 +224,145 @@ class QuickAssessmentQuestions
             ]
         ];
     }
+
+    /**
+     * Convert legacy form fields array to WhatsApp Flow format
+     * 
+     * @param array $formFields The legacy form fields array
+     * @return array The WhatsApp Flow configuration array
+     */
+    public static function convertToWhatsAppFlowFormat($formFields)
+    {
+        $result = [
+            'meta' => [
+                'version' => '7.0',
+                'data_api_version' => '3.0',
+                'title' => 'Health Assessment',
+                'description' => 'Health and wellness assessment flow'
+            ],
+            'screens' => [],
+            'flow' => []
+        ];
+
+        $phases = [];
+        foreach ($formFields as $fieldId => $field) {
+            $phase = $field['phase'] ?? 1;
+            $phases[$phase][$fieldId] = $field;
+        }
+        ksort($phases);
+
+        $screenIds = [];
+
+        foreach ($phases as $phase => $fields) {
+            foreach ($fields as $fieldId => $field) {
+                $screenId = strtoupper($fieldId . '_SCREEN');
+                $screenIds[] = $screenId;
+                $screenTitle = isset($field['header']) ? $field['header'] : $field['prompt'];
+
+                $components = [];
+
+                if (isset($field['header'])) {
+                    $components[] = ['type' => 'TextHeading', 'text' => $field['header']];
+                }
+                if (isset($field['body'])) {
+                    $components[] = ['type' => 'TextBody', 'text' => $field['body']];
+                }
+
+                $components[] = self::createComponentFromField($fieldId, $field);
+
+                $nextScreen = isset($field['next']) ? strtoupper($field['next'] . '_SCREEN') : null;
+
+                $footer = [
+                    'type' => 'Footer',
+                    'label' => 'Continue',
+                    'on-click-action' => [
+                        'name' => 'navigate',
+                        'next' => ['type' => 'screen', 'name' => $nextScreen],
+                        'payload' => [$fieldId => '${form.' . $fieldId . '}']
+                    ]
+                ];
+
+                $result['screens'][$screenId] = [
+                    'id' => $screenId,
+                    'title' => $screenTitle,
+                    'layout' => [
+                        'type' => 'SingleColumnLayout',
+                        'children' => array_merge($components, [$footer])
+                    ]
+                ];
+            }
+        }
+
+        $confirmationScreenId = 'CONFIRMATION_SCREEN';
+        $screenIds[] = $confirmationScreenId;
+
+        $result['screens'][$confirmationScreenId] = [
+            'id' => $confirmationScreenId,
+            'title' => 'Thank You',
+            'layout' => [
+                'type' => 'SingleColumnLayout',
+                'children' => [
+                    ['type' => 'TextHeading', 'text' => 'Thank You!'],
+                    ['type' => 'TextBody', 'text' => 'Your information has been collected successfully.']
+                ]
+            ],
+            'footer' => [
+                'type' => 'Footer',
+                'label' => 'Complete',
+                'on-click-action' => ['name' => 'complete']
+            ]
+        ];
+
+        $result['flow'] = $screenIds;
+
+        return $result;
+    }
+
+    /**
+     * Create a component from a field
+     *
+     * @param string $fieldId The field identifier
+     * @param array $field The field configuration
+     * @return array The component configuration
+     */
+    private static function createComponentFromField($fieldId, $field)
+    {
+        $component = [];
+
+        switch ($field['type']) {
+            case 'text':
+                $component = [
+                    'type' => 'TextInput',
+                    'name' => $fieldId,
+                    'label' => $field['prompt'],
+                    'required' => true
+                ];
+                break;
+
+            case 'button':
+                $component = [
+                    'type' => 'RadioButtonsGroup',
+                    'name' => $fieldId,
+                    'label' => $field['prompt'],
+                    'required' => true,
+                    'data-source' => array_map(fn($option) => ['id' => $option['id'], 'title' => $option['title']], $field['options'] ?? [])
+                ];
+                break;
+
+            case 'list':
+                $component = [
+                    'type' => 'NavigationList',
+                    'name' => $fieldId,
+                    'label' => $field['prompt'],
+                    'list-items' => array_map(fn($option) => [
+                        'id' => $option['id'],
+                        'main-content' => ['title' => $option['title']],
+                        'on-click-action' => ['name' => 'navigate', 'next' => ['type' => 'screen', 'name' => 'CONFIRMATION_SCREEN']]
+                    ], $field['options'] ?? [])
+                ];
+                break;
+        }
+
+        return $component;
+    }
 }
