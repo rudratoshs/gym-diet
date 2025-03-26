@@ -59,4 +59,13 @@ interface PaymentServiceInterface
      * @return bool
      */
     public function verifyWebhookSignature(string $payload, string $signature);
+
+    /**
+     * Create an internal gym plan in the payment provider.
+     *
+     * @param  \App\Models\GymSubscriptionPlan  $plan
+     * @param  string  $billingCycle  (monthly, quarterly, yearly)
+     * @return string|null  The plan ID in the payment provider
+     */
+    public function createGymInternalPlan(\App\Models\GymSubscriptionPlan $plan, string $billingCycle);
 }

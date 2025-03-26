@@ -6,6 +6,7 @@ use App\Models\Gym;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Models\GymSubscriptionPlan; // Added import
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Stripe\StripeClient;
@@ -68,6 +69,63 @@ class StripeSubscriptionService implements PaymentServiceInterface
         } catch (\Exception $e) {
             Log::error('Failed to create Stripe plan: ' . $e->getMessage());
             throw $e;
+        }
+    }
+
+    /**
+     * Create an internal gym plan in Stripe.
+     *
+     * @param  \App\Models\GymSubscriptionPlan  $plan
+     * @param  string  $billingCycle  (monthly, quarterly, yearly)
+     * @return string|null  Stripe Price ID or null on failure
+     */
+    public function createGymInternalPlan(GymSubscriptionPlan $plan, string $billingCycle)
+    {
+        try {
+            // First create a product
+            $product = $this->stripe->products->create([
+                'name' => $plan->name,
+                'description' => $plan->description ?? null,
+            ]);
+
+            // Convert price to the smallest currency unit (e.g., paise)
+            $amountInCents = (int) ($plan->price * 100);
+
+            // Map billing cycle to Stripe interval
+            $intervalMap = [
+                'monthly' => 'month',
+                'quarterly' => 'month',
+                'yearly' => 'year',
+            ];
+
+            $intervalCountMap = [
+                'monthly' => 1,
+                'quarterly' => 3,
+                'yearly' => 1,
+            ];
+
+            if (!isset($intervalMap[$billingCycle])) {
+                throw new \Exception("Invalid billing cycle: $billingCycle");
+            }
+
+            $priceData = [
+                'product' => $product->id,
+                'unit_amount' => $amountInCents,
+                'currency' => 'inr',
+                'recurring' => [
+                    'interval' => $intervalMap[$billingCycle],
+                    'interval_count' => $intervalCountMap[$billingCycle],
+                ],
+            ];
+
+            $price = $this->stripe->prices->create($priceData);
+
+            Log::info("Stripe Price Created: " . json_encode($price->toArray()));
+
+            return $price->id;
+        } catch (\Exception $e) {
+            Log::error("Failed to create Stripe internal gym plan: " . $e->getMessage());
+            return null;
         }
     }
 

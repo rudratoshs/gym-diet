@@ -5,6 +5,7 @@ namespace App\Services\Payment;
 use App\Models\Gym;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\GymSubscriptionPlan;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -318,6 +319,60 @@ class RazorpaySubscriptionService implements PaymentServiceInterface
      * @return string|null  Razorpay Plan ID or null on failure
      */
     public function createPlan(SubscriptionPlan $plan, string $billingCycle)
+    {
+        try {
+            if (!$this->razorpay) {
+                throw new \Exception("Razorpay SDK not initialized.");
+            }
+
+            // Convert price to paise (Razorpay expects smallest currency unit)
+            $amountInPaise = $plan->price * 100;
+
+            // Map billing cycle
+            $periods = [
+                'monthly' => 'monthly',
+                'quarterly' => 'quarterly',
+                'yearly' => 'yearly'
+            ];
+
+            if (!isset($periods[$billingCycle])) {
+                throw new \Exception("Invalid billing cycle: $billingCycle");
+            }
+
+            // Prepare Razorpay API request
+            $planData = [
+                "period" => $periods[$billingCycle],
+                "interval" => 1,
+                "item" => [
+                    "name" => $plan->name,
+                    "amount" => $amountInPaise,
+                    "currency" => "INR"
+                ]
+            ];
+
+            // Create the plan in Razorpay
+            $razorpayPlan = $this->razorpay->plan->create($planData);
+
+            // Log success
+            Log::info("Razorpay Plan Created: " . json_encode($razorpayPlan->toArray()));
+
+            // Return Razorpay Plan ID
+            return $razorpayPlan->id;
+
+        } catch (\Exception $e) {
+            Log::error("Failed to create Razorpay Plan: " . $e->getMessage());
+            return null;
+        }
+    }
+
+     /**
+     * Create a plan in Razorpay.
+     *
+     * @param  GymSubscriptionPlan  $plan
+     * @param  string  $billingCycle  (monthly, quarterly, yearly)
+     * @return string|null  Razorpay Plan ID or null on failure
+     */
+    public function createGymInternalPlan(GymSubscriptionPlan $plan, string $billingCycle)
     {
         try {
             if (!$this->razorpay) {

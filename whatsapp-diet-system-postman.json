@@ -2620,333 +2620,329 @@
             ],
             "description": "Subscription management and feature access"
         },
-		{
-			"name": "Web Assessment",
-			"item": [
-				{
-					"name": "Get Assessment Status",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/web-assessment/status",
-							"host": ["{{base_url}}"],
-							"path": ["api", "web-assessment", "status"]
-						},
-						"description": "Get the current assessment status for the authenticated user"
-					},
-					"response": []
-				},
-				{
-					"name": "Start Assessment",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"assessment_type\": \"moderate\",\n    \"abandon_existing\": false\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/web-assessment/start",
-							"host": ["{{base_url}}"],
-							"path": ["api", "web-assessment", "start"]
-						},
-						"description": "Start a new assessment"
-					},
-					"response": []
-				},
-				{
-					"name": "Get Current Question",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/web-assessment/question?session_id=123",
-							"host": ["{{base_url}}"],
-							"path": [
-								"api",
-								"web-assessment",
-								"question"
-							],
-							"query": [
-								{
-									"key": "session_id",
-									"value": "123",
-									"description": "Assessment session ID"
-								}
-							]
-						},
-						"description": "Get current question for assessment session"
-					},
-					"response": []
-				},
-				{
-					"name": "Submit Response",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"session_id\": 123,\n    \"question_id\": \"age\",\n    \"response\": 35\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/web-assessment/respond",
-							"host": ["{{base_url}}"],
-							"path": ["api", "web-assessment", "respond"]
-						},
-						"description": "Submit response to current question"
-					},
-					"response": []
-				},
-				{
-					"name": "Resume Assessment",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"session_id\": 123\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/web-assessment/resume",
-							"host": ["{{base_url}}"],
-							"path": ["api", "web-assessment", "resume"]
-						},
-						"description": "Resume an existing assessment"
-					},
-					"response": []
-				}
-			],
-			"description": "Endpoints for web-based assessment flow"
-		},
-		{
-			"name": "Web Diet Plan",
-			"item": [
-				{
-					"name": "Get Active Diet Plan",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/web-diet-plan/active",
-							"host": ["{{base_url}}"],
-							"path": ["api", "web-diet-plan", "active"]
-						},
-						"description": "Get active diet plan for user"
-					},
-					"response": []
-				},
-				{
-					"name": "Get Day Plan",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/web-diet-plan/day?plan_id=123&day=monday",
-							"host": ["{{base_url}}"],
-							"path": ["api", "web-diet-plan", "day"],
-							"query": [
-								{
-									"key": "plan_id",
-									"value": "123",
-									"description": "Diet plan ID"
-								},
-								{
-									"key": "day",
-									"value": "monday",
-									"description": "Day of week"
-								}
-							]
-						},
-						"description": "Get meal plan for specific day"
-					},
-					"response": []
-				},
-				{
-					"name": "Get Meal Details",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/web-diet-plan/meal?meal_id=456",
-							"host": ["{{base_url}}"],
-							"path": ["api", "web-diet-plan", "meal"],
-							"query": [
-								{
-									"key": "meal_id",
-									"value": "456",
-									"description": "Meal ID"
-								}
-							]
-						},
-						"description": "Get detailed meal information"
-					},
-					"response": []
-				},
-				{
-					"name": "List Diet Plans",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/web-diet-plan/list",
-							"host": ["{{base_url}}"],
-							"path": ["api", "web-diet-plan", "list"]
-						},
-						"description": "List all diet plans for user"
-					},
-					"response": []
-				},
-				{
-					"name": "Archive Diet Plan",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{auth_token}}",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"plan_id\": 123\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/web-diet-plan/archive",
-							"host": ["{{base_url}}"],
-							"path": ["api", "web-diet-plan", "archive"]
-						},
-						"description": "Archive an existing diet plan"
-					},
-					"response": []
-				}
-			],
-			"description": "Endpoints for diet plan management"
-		}
+        {
+            "name": "Web Assessment",
+            "item": [
+                {
+                    "name": "Get Assessment Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/web-assessment/status",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-assessment", "status"]
+                        },
+                        "description": "Get the current assessment status for the authenticated user"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Start Assessment",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"assessment_type\": \"moderate\",\n    \"abandon_existing\": false\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/web-assessment/start",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-assessment", "start"]
+                        },
+                        "description": "Start a new assessment"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Current Question",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/web-assessment/question?session_id=123",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-assessment", "question"],
+                            "query": [
+                                {
+                                    "key": "session_id",
+                                    "value": "123",
+                                    "description": "Assessment session ID"
+                                }
+                            ]
+                        },
+                        "description": "Get current question for assessment session"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Submit Response",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"session_id\": 123,\n    \"question_id\": \"age\",\n    \"response\": 35\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/web-assessment/respond",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-assessment", "respond"]
+                        },
+                        "description": "Submit response to current question"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Resume Assessment",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"session_id\": 123\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/web-assessment/resume",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-assessment", "resume"]
+                        },
+                        "description": "Resume an existing assessment"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Endpoints for web-based assessment flow"
+        },
+        {
+            "name": "Web Diet Plan",
+            "item": [
+                {
+                    "name": "Get Active Diet Plan",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/web-diet-plan/active",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-diet-plan", "active"]
+                        },
+                        "description": "Get active diet plan for user"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Day Plan",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/web-diet-plan/day?plan_id=123&day=monday",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-diet-plan", "day"],
+                            "query": [
+                                {
+                                    "key": "plan_id",
+                                    "value": "123",
+                                    "description": "Diet plan ID"
+                                },
+                                {
+                                    "key": "day",
+                                    "value": "monday",
+                                    "description": "Day of week"
+                                }
+                            ]
+                        },
+                        "description": "Get meal plan for specific day"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Meal Details",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/web-diet-plan/meal?meal_id=456",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-diet-plan", "meal"],
+                            "query": [
+                                {
+                                    "key": "meal_id",
+                                    "value": "456",
+                                    "description": "Meal ID"
+                                }
+                            ]
+                        },
+                        "description": "Get detailed meal information"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Diet Plans",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/web-diet-plan/list",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-diet-plan", "list"]
+                        },
+                        "description": "List all diet plans for user"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Archive Diet Plan",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"plan_id\": 123\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/web-diet-plan/archive",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "web-diet-plan", "archive"]
+                        },
+                        "description": "Archive an existing diet plan"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Endpoints for diet plan management"
+        }
     ]
 }

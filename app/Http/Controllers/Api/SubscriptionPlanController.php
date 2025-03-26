@@ -34,9 +34,10 @@ class SubscriptionPlanController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $plans = SubscriptionPlan::when($request->has('active'), function ($query) use ($request) {
-            return $query->where('is_active', $request->boolean('active'));
-        })->get();
+        $plans = SubscriptionPlan::with('features', 'planFeatures') // Eager load
+            ->when($request->has('active'), function ($query) use ($request) {
+                return $query->where('is_active', $request->boolean('active'));
+            })->get();
 
         return SubscriptionPlanResource::collection($plans);
     }
@@ -171,7 +172,7 @@ class SubscriptionPlanController extends Controller
      */
     public function show($id)
     {
-        $plan = SubscriptionPlan::findOrFail($id);
+        $plan = SubscriptionPlan::with('features')->findOrFail($id);
         return new SubscriptionPlanResource($plan);
     }
 
@@ -251,7 +252,7 @@ class SubscriptionPlanController extends Controller
      */
     public function publicPlans()
     {
-        $plans = SubscriptionPlan::where('is_active', true)->get();
+        $plans = SubscriptionPlan::with('features')->where('is_active', true)->get();
         return SubscriptionPlanResource::collection($plans);
     }
 }

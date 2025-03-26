@@ -210,13 +210,13 @@ class SubscriptionService
             }
 
             // Prepare minimal plan details
-            $plan = new SubscriptionPlan([
+            $plan = new GymSubscriptionPlan([
                 'name' => $data['name'],
                 'price' => $data['price']
             ]);
 
             // Create Plan in the Payment Provider (e.g., Razorpay)
-            $paymentProviderPlanId = $paymentService->createPlan($plan, $billingCycle);
+            $paymentProviderPlanId = $paymentService->createGymInternalPlan($plan, $billingCycle);
 
             if (!$paymentProviderPlanId) {
                 throw new \Exception("Failed to create plan with $paymentProvider.");
@@ -231,6 +231,21 @@ class SubscriptionService
                 'is_active' => $data['is_active'] ?? true,
                 'payment_provider_plan_id' => $paymentProviderPlanId,
             ]);
+
+            // Attach internal features to the plan if provided
+            if (!empty($data['features']) && is_array($data['features'])) {
+                foreach ($data['features'] as $feature) {
+                    if (!isset($feature['subscription_feature_id'])) {
+                        continue;
+                    }
+
+                    $gymPlan->internalFeatures()->create([
+                        'subscription_feature_id' => $feature['subscription_feature_id'],
+                        'value' => $feature['value'] ?? null,
+                        'limit' => $feature['limit'] ?? null,
+                    ]);
+                }
+            }
 
             // Commit the transaction
             DB::commit();

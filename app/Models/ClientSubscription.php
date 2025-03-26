@@ -55,7 +55,7 @@ class ClientSubscription extends Model
     /**
      * Get the gym subscription plan associated with this subscription.
      */
-    public function plan()
+    public function gymSubscriptionPlan()
     {
         return $this->belongsTo(GymSubscriptionPlan::class, 'gym_subscription_plan_id');
     }
@@ -68,5 +68,28 @@ class ClientSubscription extends Model
     public function isActive()
     {
         return $this->status === 'active' && $this->end_date > now();
+    }
+
+    /**
+     * Determine if the subscription is expired.
+     *
+     * @return bool
+     */
+    public function isExpired()
+    {
+        return $this->status !== 'active' || ($this->end_date && $this->end_date <= now());
+    }
+
+    public function featureUsages()
+    {
+        return $this->hasMany(InternalFeatureUsage::class);
+    }
+
+    public function getFeatureUsageByCode(string $code)
+    {
+        return $this->featureUsages()
+            ->whereHas('feature', function ($query) use ($code) {
+                $query->where('code', $code);
+            })->first();
     }
 }

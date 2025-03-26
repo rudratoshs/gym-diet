@@ -145,10 +145,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // Client Subscription routes
     Route::middleware('permission:view_clients')->get('/client-subscriptions', [ClientSubscriptionController::class, 'index']);
+    Route::middleware('permission:view_clients')->get('/client-subscriptions/{id}', [ClientSubscriptionController::class, 'show']);
     Route::middleware('permission:edit_clients')->post('/client-subscriptions', [ClientSubscriptionController::class, 'store']);
-    Route::middleware('permission:view_clients')->get('/client-subscriptions/{clientSubscription}', [ClientSubscriptionController::class, 'show']);
-    Route::middleware('permission:edit_clients')->put('/client-subscriptions/{clientSubscription}', [ClientSubscriptionController::class, 'update']);
-    Route::middleware('permission:edit_clients')->delete('/client-subscriptions/{clientSubscription}', [ClientSubscriptionController::class, 'destroy']);
+    Route::middleware('permission:edit_clients')->put('/client-subscriptions/{id}', [ClientSubscriptionController::class, 'update']);
+    Route::middleware('permission:edit_clients')->post('/client-subscriptions/{id}/cancel', [ClientSubscriptionController::class, 'cancel']);
 
     // Client self-subscription route
     Route::post('/users/{user}/subscribe', [ClientSubscriptionController::class, 'subscribe']);

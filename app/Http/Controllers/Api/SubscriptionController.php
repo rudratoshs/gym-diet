@@ -11,6 +11,7 @@ use App\Services\SubscriptionService;
 use App\Services\Payment\PaymentServiceFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use DB;
 
 class SubscriptionController extends Controller
 {
@@ -43,7 +44,6 @@ class SubscriptionController extends Controller
         }
 
         $subscription = $this->subscriptionService->getActiveSubscription($gym->id);
-
         if (!$subscription) {
             return response()->json(['message' => 'No active subscription found'], 404);
         }

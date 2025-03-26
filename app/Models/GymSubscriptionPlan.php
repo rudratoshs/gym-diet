@@ -20,7 +20,6 @@ class GymSubscriptionPlan extends Model
         'description',
         'price',
         'billing_cycle',
-        'features',
         'is_active',
         'payment_provider_plan_id'
     ];
@@ -31,7 +30,6 @@ class GymSubscriptionPlan extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'features' => 'json',
         'is_active' => 'boolean',
         'price' => 'decimal:2',
     ];
@@ -63,5 +61,13 @@ class GymSubscriptionPlan extends Model
             ->where('status', 'active')
             ->where('end_date', '>', now())
             ->count();
+    }
+
+    /**
+     * Get the internal features associated with this plan.
+     */
+    public function internalFeatures()
+    {
+        return $this->hasMany(InternalPlanFeature::class);
     }
 }
